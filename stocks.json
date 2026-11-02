@@ -1,0 +1,15 @@
+{
+  "_comment": "AI단테.md §6 자동 동기화 (toss_capture.py 갱신 · 활성 2종). 사용자가 §6 갱신 시 다음 회차에 자동 반영.",
+  "stocks": [
+    {
+      "name": "양지사",
+      "code": "030960",
+      "tag": "active"
+    },
+    {
+      "name": "미원상사",
+      "code": "002840",
+      "tag": "active"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "_doc": "선반영(디커플링) 역발상 에이전트 — US 섹터 ↔ KR 테마 매핑 사전 (테스트 v0.1)",
+  "_logic": "US 섹터가 상승추세(5MA 위)인데 어젯밤 급락 + KR 동조 테마가 어제 먼저 하락(선반영) → 오늘 아침 공포매물 역발상 후보",
+  "_us_symbol": "Yahoo Finance 심볼 (ETF=섹터 프록시 / leaders=대표 개별주)",
+  "_kr_code": "KRX 단축코드 6자리 (스캔 시 캐시 종목명으로 자동 검증)",
+  "version": "decouple_map_v0.1_2026-06-18",
+  "themes": [
+    {
+      "key": "반도체장비",
+      "label": "반도체 장비/소부장",
+      "us": { "etf": ["SOXX", "SMH"], "leaders": ["AMAT", "LRCX", "KLAC", "ASML"] },
+      "kr": [
+        { "code": "240810", "name": "원익IPS" },
+        { "code": "403870", "name": "HPSP" },
+        { "code": "036930", "name": "주성엔지니어링" },
+        { "code": "095610", "name": "테스" },
+        { "code": "084370", "name": "유진테크" },
+        { "code": "042700", "name": "한미반도체" }
+      ]
+    },
+    {
+      "key": "양자컴퓨팅",
+      "label": "양자컴퓨팅",
+      "us": { "etf": ["QTUM"], "leaders": ["IONQ", "RGTI", "QBTS"] },
+      "kr": [
+        { "code": "046970", "name": "우리로" },
+        { "code": "115500", "name": "케이씨에스" },
+        { "code": "056360", "name": "코위버" },
+        { "code": "115440", "name": "우리넷" }
+      ]
+    },
+    {
+      "key": "원전",
+      "label": "원자력 발전",
+      "us": { "etf": ["NLR", "URA"], "leaders": ["CEG", "OKLO", "SMR"] },
+      "kr": [
+        { "code": "034020", "name": "두산에너빌리티" },
+        { "code": "052690", "name": "한전기술" },
+        { "code": "083650", "name": "비에이치아이" },
+        { "code": "032820", "name": "우리기술" }
+      ]
+    },
+    {
+      "key": "신재생",
+      "label": "신재생/태양광",
+      "us": { "etf": ["ICLN", "TAN"], "leaders": ["FSLR", "ENPH"] },
+      "kr": [
+        { "code": "009830", "name": "한화솔루션" },
+        { "code": "322000", "name": "HD현대에너지솔루션" },
+        { "code": "010060", "name": "OCI홀딩스" },
+        { "code": "011930", "name": "신성이엔지" },
+        { "code": "112610", "name": "씨에스윈드" }
+      ]
+    },
+    {
+      "key": "2차전지",
+      "label": "2차전지/소재",
+      "us": { "etf": ["LIT"], "leaders": ["ALB"] },
+      "kr": [
+        { "code": "247540", "name": "에코프로비엠" },
+        { "code": "003670", "name": "포스코퓨처엠" },
+        { "code": "066970", "name": "엘앤에프" }
+      ]
+    },
+    {
+      "key": "방산",
+      "label": "방위산업",
+      "us": { "etf": ["ITA"], "leaders": ["LMT", "RTX"] },
+      "kr": [
+        { "code": "012450", "name": "한화에어로스페이스" },
+        { "code": "079550", "name": "LIG넥스원" },
+        { "code": "064350", "name": "현대로템" }
+      ]
+    },
+    {
+      "key": "AI인프라",
+      "label": "AI인프라",
+      "_scope": "전력/데이터센터 인프라 (반도체는 반도체장비 테마와 중복이라 제외). proxy=GRID(전력망/전기설비 ETF)",
+      "us": { "etf": ["GRID", "DTCR"], "leaders": ["VRT", "ETN", "GEV", "POWL"] },
+      "kr": [
+        { "code": "010120", "name": "LS ELECTRIC" },
+        { "code": "267260", "name": "HD현대일렉트릭" },
+        { "code": "298040", "name": "효성중공업" },
+        { "code": "062040", "name": "산일전기" },
+        { "code": "033100", "name": "제룡전기" }
+      ]
+    }
+  ],
+  "params": {
+    "us_overnight_drop_pct": -3.0,
+    "us_overnight_rise_pct": 0.5,
+    "kr_prereflect_drop_pct": -2.0,
+    "vol_surge_lookback": 20,
+    "vol_down_half_ratio": 0.5,
+    "support_window_pct": 3.0
+  }
+}

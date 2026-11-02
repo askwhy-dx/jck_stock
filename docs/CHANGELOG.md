@@ -1,0 +1,198 @@
+# stock 변경 이력
+
+완료된 수정 내역 보관용. 현재 상태·규칙은 `../CLAUDE.md`, 파이프라인 상세는 `AUTOMATION_README.md`, 매매·종목 이력은 `../AI단테.md` §6 · `../AI단테_아카이브.md` · `../AI단테_매매일지.md`.
+새 항목은 맨 위에 추가한다.
+
+## 2026-10-29 — 활성 0종에서 과거 55종 복원 버그 수정
+
+- `toss_capture.py`: 활성 SSOT 존재 여부와 목록 길이를 분리. 정상 0종은 빈 stocks.json으로 동기화하고 밥그릇3 관찰 대상은 별도로 유지. §6 이력 전체에서 종목을 복원하는 fallback 제거.
+- `run_daily_dante.bat`: 파이프 뒤 PowerShell 종료코드 대신 수집·분석·스캐너·휴장·Slack 원래 명령의 종료코드로 분기. 실패 요약 후 exit 1 반환.
+- 회귀검증: 빈 SSOT+과거 이력, 빈 줄, 1종, 섹션·줄 부재, 정상 0종 동기화+밥그릇3 분리, 미확인 빈 목록 저장 차단, 배치 실패 전파.
+- 백업: `backup/*.bak_emptylineup_20261029`, 문서는 `backup/docs/`.
+- 확인: 회귀 테스트 7건 통과, 실제 §6↔stocks.json 활성 0종 정합. 17:05 full 재실행에서 관찰 2종 수집 성공 후 Claude 사용량 제한(18:00 해제 안내)으로 분석 중단. 배치 exit 1·실패 요약 기록, 업로드·Slack 생략 확인.
+
+## 2026-10-28 — ⚡ 단타 개편: 거래대금×인기 (09:10)
+
+- 사용자 지시: ① 🌙 오버나잇 삭제(너무 고가에 사는 구조라 안 맞음) ② 기존 단타 3종(오버나잇·09:15 매수·돌파임박) 삭제, 「네이버 증권 거래대금 20위 안 중 인기종목 순위가 거래대금 순위보다 높은 종목」으로 교체 ③ 09:10 스케줄. 보유 = 3거래일.
+- 판단 근거(일봉 2025-01~2026-10, 비용 0.25%): 오버나잇 신호 974건 다음 날 시가 매도 +0.52% · D1 종가 −0.71% · D3 종가 −0.67% · +5% 익절/D3 −0.41% · +3% 익절/D3 −0.29% → 3일 보유엔 우위 없음. 급등 후 −5~−15% 눌림 매수 3일 505건 −0.61%(중앙 +1.66%). 기준(아무 종목 3일) −0.03%.
+- 신규 `screen_danta_popular.py`(네이버 `priceTop` KOSPI+KOSDAQ 일반 주식 합산 거래대금 20위 · `searchTop/all` 인기 순위) · `build_danta_tab.js` 재작성(단타 탭 1표) · `run_danta.bat` 재작성(인자 없음) · 대시보드 🌙 오버나잇 탭 삭제 · `run_daily_dante.bat` [B1h]·[B3c] 삭제 · `exposure.js` danta 줄 삭제.
+- 스케줄: `Dante_Danta_0910` 등록(평일 09:10, 0915 XML 복제) · `Dante_Danta_0915`·`Dante_Danta_1510` 삭제(XML 백업 `backup/scheduler/*.bak_popular_20261028.xml`).
+- 후속(같은 날): 이름 「⚡ 단타인기」(탭 버튼·탭 제목·Slack 제목) · 종목 앞에 시장 표기(탭 `코스피 종목명`, Slack `[코스피] *종목명*`) · 시각은 09:10 유지(사용자 선택, 추천안 10:00 은 기각).
+- 거래량 조건(전일 100%·70%) 검토 → 사용자 「거래량 제외」로 미채택. 실측 수치는 기술정리 §5.3d.
+- 문서: CLAUDE.md 단타인기 행·스케줄표 · 기술정리 §2.1 스케줄·§2.2 B1h/B3c 삭제·§5.3b/5.3c 삭제 표기·§5.3d 신설·§7.3 목표 이탈 매 회차.
+- 확인: 10-28 10:39 실행 7종(삼성전자·삼성SDI·LG이노텍·NAVER·로보티즈·대한광통신·LG전자) · verify_sync OK · 업로드·Slack 은 첫 스케줄 실행(10-29 09:10)에서.
+
+## 2026-10-28 — 목표가 이탈 시 종목 삭제 (매 회차)
+
+- 사용자 지시: 목표가 이탈 시 종목 삭제.
+- `auto_intake.js`: 목표 초과(T3-U) 퇴출을 08:30 KRX 종가 전용에서 **매 회차(08:30·16:30·19:00 `--summary-only`) `lastClose` 기준**으로 이동 · 사유 「목표 이탈」 · Slack 「🛑 손절·목표 이탈」에 포함.
+- `build_bowl3_tab.js`: 종가 > 저장 목표 → 삭제 + Slack + 20거래일 재진입 금지(손절과 동일) · 새로 들어올 때 이미 목표 초과면 건너뜀.
+- 확인: 두 스크립트 `--dry-run` 정상(현재 해당 종목 0). 백업 `backup/*.bak_target_20261028`.
+
+## 2026-10-27 — 🌙 오버나잇 손절가 Slack·탭 표시
+
+- 사용자 지시: Slack 「매매: 15:20~15:30 …」 줄 삭제, 종목 줄 거래량 뒤에 「, 손절가 X원」 · 대시보드 🌙 오버나잇 표 거래량 뒤에 「손절가」 열.
+- `screen_danta_close.py`: `ON_STOP = 0.02` · `stop_price()`(KRX 호가 단위 내림) → `picks[].stop`. `build_danta_tab.js`: 손절가 열(stop 없는 이전 파일은 같은 산식 폴백) · 하단 설명에 손절가 산식.
+- 확인: 10-27 나무가 17,090 → 손절가 16,740 (`build_danta_tab.js --dry-run`).
+- 문서: CLAUDE.md `screen_danta_close.py` 행 · 기술정리 [B3c]·§5.3c 손절가 문단. 종전 문서의 ⚡ 단타 `DT_STOP`(09:15 −1%)은 코드에 없어 문구 삭제(미표시로 정정).
+
+## 2026-10-27 — 폴더 개명(10-26) 뒤 경로 누락 수정
+
+- 증상: `Dante_Auto_0815`(10-27 08:30)·`Dante_Auto_1900`(10-26 19:00) 결과 0x8007010B(디렉터리 이름 잘못됨) · `Dante_Danta_0915`(10-27) `ModuleNotFoundError: No module named 'toss'`.
+- 원인: 10-26 `test\stock`→`jck_stock`, `stock-usa`→`jck_stock-usa` 개명 때 예약작업 3건과 코드의 `sys.path` 가 옛 이름 그대로였음.
+- 예약작업(관리자 권한, 사용자 실행): `Dante_Auto_0815`·`Dante_Auto_1900`·`Dante_Reflect_Monthly` 실행 파일·시작 위치 → `C:\Users\User\Desktop\test\jck_stock`. 액션만 교체(트리거·실행 수준 그대로).
+- 코드: `sys.path` 의 `ROOT.parent / "stock-usa"` → `"jck_stock-usa"` 7개 파일(`screen_danta_close.py`·`screen_danta_prebreakout.py`·`screen_bowl3_quality.py`·`toss_api_snapshot.py`·`backtest_buy_gate_4of5.py`·`backtest_danta_open.py`·`backtest_danta_stop.py`).
+- 문서: CLAUDE.md(`screen_bowl3_quality.py` 행)·기술정리 밥그릇3 절·docstring 2곳의 토스 클라이언트 경로.
+- 10-27 09:15 회차 verify_sync 차단(stocks.json [009780] vs 10-26 16:30 analysis 3종)은 08:30 분석 미실행 여파로 보고 미조치 — 다음 full 회차 뒤 재확인.
+
+## 2026-10-27 — 🇺🇸 USA 탭 추가
+
+- 대시보드 탭 버튼·`#tab-usa`·`switchTab` 에 usa 추가(백업 `backup/분석_대시보드.html.bak_usatab_20261027`). 내용은 `../jck_stock-usa/daily.py` 가 평일 21:50 교체·업로드·Slack
+
+## 2026-10-26 — 손절 이탈 = 매 회차 무조건 삭제
+
+- 사용자 지시: 손절가 벗어난 종목 삭제 + 앞으로 스케줄 구동 시 손절 넘어가면 무조건 삭제.
+- 10-26 종가(15:30 분봉) 기준 삭제 3종: 🎯 잇츠한불 10,580 < 10,670 · 셀트리온 190,000 < 191,600 / 🍚 태성 47,500 < 48,750 (Slack 🛑 발송). 08:30 판정은 전일 KRX 확정봉만 봐서 당일 이탈이 남아 있었음.
+- `auto_intake.lastClose()` 신설(밥그릇3 공용) · `--summary-only` 도 손절 퇴출 수행 · `run_daily_dante.bat` full 맨 앞 [0s]에 손절 점검(토스·분석 실패해도 돎). 16:30 토스 스냅샷 0종(10-26)과 무관하게 동작.
+- 종가 원천: KRX 캐시, 오늘 봉이 없고 15:31 이후면 네이버 15:30 분봉. 네이버 일봉·closePrice 는 장후 시간외·NXT 로 계속 바뀌어(태성 47,650→47,800, 공식 47,500) 처음 구현에서 교체.
+- 문서: CLAUDE.md(스케줄 16:30·19:00 줄·auto_intake·build_bowl3_tab 행) · 기술정리 §2.3 [0s]·[2e] · §7.0 손절 점검 · §7.0a 신설.
+- 백업 `backup/*.bak_stopexit_20261026`.
+
+## 2026-10-26
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 🛑 오버나잇·단타 탭 손절가 열 | 사용자 「손절가 가능한지 분석」→「대시보드 종목들 손절가 넣어줘」(익절은 +3~4% 전량 매도라 불필요). `backtest_danta_stop.py` 신설(1분봉, 오버나잇 959·단타 274건) → 오버나잇 = 15:10 가격 −2% · 단타 = 09:15 가격 −1% · 호가 단위 내림 · `build_danta_tab.js` 만 수정(Slack·screen_danta_close 불변). 결과: 손절은 오버나잇 시가 매도(+0.57%)보다 못하고 단타는 손실만 줄임(−0.75→−0.33%) — 기술정리 §5.3c | `backup/*.bak_dantastop_20261026` · `backup/build_danta_tab.js.bak_stoploss_20261026` |
+
+## 2026-10-23
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| ⚡ 단타 09:15 수급 = 외+기 → 프로그램 · 호가 조건 추가 | 사용자 「09:15 외+기 캐치되나」→ 실측: 투자자별(외국인·기관)은 장중 null·15:36과 다음 날 06:50에만 반영, 10-22 09:15 값 = 확정치 0~10%(HT로보틱스 0주 vs 확정 −269,214). 프로그램(`program-trades`)은 갱신시각 없이 계속 변동 = 실시간 집계로 판단(09:15 실측은 10-26 첫 회차). 사용자 「프로그램 전환 + 판매대기 많다 조건」→ `screen_danta_close.py` `program_net`(당일 차익+비차익 > 0, 행 없음 = 미충족·신호일 대체 없음) · `book_totals`(`/api/v1/orderbook` 매도잔량 합 > 매수잔량 합, 18:43 인화정공 7,116/1,655 ≈ 화면 7,274/2,597). 단타 탭 열 「외+기」→「프로그램」「판매/구매대기」. 백테스트 없음 | `backup/*.bak_program_book_20261023` |
+| 🧪 단타 09:15 규칙 백테스트 (`backtest_danta_open.py`) | 사용자 「이렇게 해서 백테스트, 25년부터 2개년」 → 오버나잇 신호 974건(2025-01~2026-10, 종가 판정) · 토스 1분봉 `before=` 09:00~09:14 · D 종가 = 토스 일봉(1분봉과 같은 수정주가 — KRX 원주가와 섞으면 분할 종목 39건이 ±80~400%로 깨짐). 09:15 매수→종가: 조건 없음 n959 비용 뒤 −0.34% · ①시가 위+②15분 20% n274 −0.55% · +신호일 프로그램>0 n196 +0.01% · 신호일 프로그램≤0 n78 −1.97% · 오버나잇(S 종가→D 시가) n965 +0.51%. 장중 프로그램·호가 이력 없음 = 미측정. 같은 날 19:00 회차는 사용자 지시로 eve 마커 수동 생성해 건너뜀 | — |
+| ⏰ 15:30 → 16:30 · 📥 매집 삭제 · Slack 위험 종목 → 밥그릇3 | 사용자 「15:30에 수급체크 안 되나」→ 16:54 수동 full 실행(`--force`, 마커 없음)에서 외국인 9/9 확인(15:30 스냅샷은 9/9 null · 프로그램도 15:30↔16:50 값 변동, 셀트리온 −8,963→−1,473) → 「16:30으로」. 16:30 매집 회차와 HTML·업로드 충돌 → 사용자 「매집 스케쥴·대시보드·슬랙 삭제」. ① `Dante_Auto_1530` 트리거 16:30(다음 10-26) · `Dante_Maejip_1630` 삭제(XML 백업) ② 대시보드 매집 탭 버튼·섹션·switchTab·CSS 삭제(탭 6개) ③ `slack_send.js` full 회차 = 1장: 🚨 위험 종목 섹션 → 🍚 밥그릇3 매수 줄 목록(두 번째 메시지 폐지) · 밥그릇3 대상을 `bowl3_watch.json`(탭과 같은 5종)으로 — 종전 점수 순 5종은 손절 퇴출된 엘오티베큠·이엔에프가 들어가고 탭의 태성·와이씨가 빠지던 버그 ④ 표기 15:30·19:00 → 16:30·19:00(auto_intake·build_bowl3_tab·toss_api_snapshot) | `backup/*.bak_norisk_20261023` · `*.bak_nomaejip_20261023` · `*.bak_1630_20261023` · `backup/scheduler/` |
+| 🟢🟡 매수 판정 = 양봉 제외 · 3개 중 2개+ (Slack + 대시보드) | 사용자 「조합 중 승률 좋은 2개」→「슬랙에 뭘 노출」→「음봉 매수 괜찮나」→「이렇게 표기, 대시보드도 수정」. `auto_intake.js buyVerdict`(SSOT, export) = 가격 pass + 거래량·외국인·프로그램 3개 → 🟢 3/3 매수 · 🟡 2/3 매수가능 (항목❌) · ⚪ 대기, 뒤에 양봉/음봉 참고. `slack_send.js buyCell` 이 이를 사용(⚪ 제외) · `gateCell`(대시보드 손익비·밥그릇3 요약표) 맨 위 굵게 판정 + 「양봉(참고)」 · 두 표 범례 문구 갱신. 판정 7케이스 assert 통과 · 15:30 데이터로 요약표 재생성(로컬, 업로드 안 함 — 19:00 회차가 발행). 근거 = 아래 백테스트 + 조합 16종(이 규칙 n1437 27.8%·+0.19%, 4개 연도 모두 옛 규칙보다 높음 · 양봉 포함 조합 전부 하위 8 · 음봉일 진입 28.6% > 양봉일 25.0%). 같은 날 앞 행(5/5·4/5 표시)을 대체 | `backup/*.bak_buyverdict_20261023` |
+| 📨 15:30·19:00 Slack 충족표 = 매수 대상만 | 사용자 지시 「슬랙에만 적용, 매수할 종목과 충족만 보여준다」 → `slack_send.js` `buyCell`·`gateRows`: 🟢 5/5 매수 · 🟡 4/5 매수가능(가격·양봉 pass + 거래량·외국인·프로그램 중 1개만 미충족, unknown 포함 → 15:30 외국인 미집계 종목도 표시) · 나머지 제외 · 표 `종목 | 충족` 2열 · 제목 「🎯 손익비 매수」·「🍚 밥그릇3 매수」. 판정(`all_required_met`)·대시보드·정렬은 5/5 그대로. 검증 = 가짜 판정 8케이스 assert 통과 + 10-22 15:30·19:00 dry-run(양봉 전 종목 fail → 「없음」). | `backup/*.bak_buyonly_20261023` |
+| 🧪 5/5 vs 4/5 백테스트 | `backtest_buy_gate_4of5.py` 신설 → `data/backtest_buy_gate_4of5.json`·수급 캐시 `data/backtest_flow_cache.json`. 손익비 신호(편입일 = 손절 폭 2~5% 양봉) 2,227건, 편입 뒤 20거래일 종가 ≤ 1차인 날마다 5종 판정(외국인·프로그램 = 토스 until= 당일 행) → 판정일 종가 진입·+10%/손절/60일. 결과: A 5/5만 n310 24.2%·−0.45% · B +4/5매수가능 n685 25.0%·−0.23% · C 조건 무시 n2207 27.3%·+0.07%. 그룹별 거래량❌ 25.7%·−0.07 / 외국인❌ 23.4%·−0.56(n47) / 프로그램❌ 28.6%·+0.54(n63) / 양봉❌ 27.2%·+0.21 / ≤3/5 26.6%·0.0. 결론 = 4/5 허용은 해롭지 않으나 진입조건 자체에 우위 없음. 상장폐지 20종 조회 실패(생존 편향 소) · 수급 행 없음 219일 = 미충족 처리 | 신규 파일 |
+
+## 2026-10-21
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 🌙 오버나잇 탭 분리 · 국면 필터 제외 | 사용자 지시 ①15:10 종가 종목 제시 = 대시보드 「오버나잇」 탭 ②09:15 매수 추천 = 「단타」 탭(08:15 안은 NXT 장전이라 사용자가 09:15 유지 선택) ③국면 필터 제외 ④19:30 테스트(Slack·대시보드). HTML `btn-overnight`·`#tab-overnight`·`#overnight-tab-summary`·switchTab 3맵 · `build_danta_tab.js` 두 섹션 교체 · `screen_danta_close.py` regime 항상 True·Slack 「🌙 오버나잇」 · 1회 작업 `Dante_Danta_Test_1930`(테스트 뒤 삭제) | `backup/분석_대시보드.html.bak_overnight_20261021` |
+| ⚡ 종가 베팅 · 09:15 매수 추천 | 사용자 지시 ①수정 제안(종가 베팅 + 국면 필터) ②다음 날 09:15 수급·거래량 체크 후 매수 추천 → 「테스트 하지 말고 그냥 적용」(1분봉 백테스트 수집 중단). `screen_danta_close.py`(`--close`/`--open`) · `run_danta.bat`(ASCII·CRLF) · 작업 `Dante_Danta_1510`·`Dante_Danta_0915`(따라잡기 끔, 15분 제한) 신설 · `build_danta_tab.js` 3블록(종가 베팅·09:15·돌파임박). 첫 실행 10-22 09:15(전날 파일 없음 → 건너뜀) · 15:10 | 신규 파일 |
+| 체결강도 판정 폐지 · 단타 3일 규칙 | 사용자 지시 「15:30 장 종료 이후니 체결강도 필요없다, 수급·거래량만」→ `claude_dante_analyze.js normalizeEntryConditions` execution_strength 항상 not_required(카드 기준 무시) · 프롬프트 문구 갱신. 「돌파임박 최대 3일·+5%」→ 3일 백테스트: 2,353건 +5% 도달 24%·평균 −0.05%(비용 뒤 −0.30%), 손절 −3%/−5% 추가 −0.22%/−0.06%, 아무 종목 같은 규칙 29%·−0.03% = 우위 없음. 탭 문구·docstring 갱신 | 같은 날 `bak_danta` |
+| 15:30·19:00 = 토스 Open API · ⚡ 단타 탭 | 사용자 지시 ①손익비·밥그릇3 은 기존 15:30·19:00 신호 유지하되 캡처 말고 API ②돌파임박(단타) 신호기 신설 — 08:30 손익비 → 밥그릇3 → 단타 순, 15:30·19:00 제외 ③대시보드 단타 탭 ④단타는 공시·재무 없이 차트+수급 ⑤2년 백테스트. `toss_api_snapshot.py` 신설(bat [1] toss_capture.py 대체) · `claude_dante_analyze.js` api_chart txt 로더(PNG 보다 우선)·`applyApiSnapshot` 당일 외국인·프로그램·양봉·거래량 기계 주입 · `screen_danta_prebreakout.py`·`build_danta_tab.js` 신설 · bat [B1g] 를 [B1d] 앞으로, [B1h]·[B3c] 추가 · HTML ⚡ 단타 탭(버튼·`#tab-danta`·switchTab 3맵) · exposure.js `danta` 섹션(Slack 줄, 자동 편입 아님). 단타 백테스트 24조합 전부 마이너스(최선 2,353건 다음 날 시가→종가 −0.11%, 시장 −0.16%) → 가격 미산출·표시 전용. `toss_capture.py` 는 16:30 매집용으로 남김 | `backup/*.bak_danta_20261021` · `backup/data/prices_2026-10-21.json.bak_danta_20261021` |
+| 🍚 밥그릇3 박스 기간 완화 · 120선 제외 | 사용자 지시 「밥그릇3 단일완화 적용」·「120선 둘 다 안 좋으면 빼게」. `screen_bowl3_quality.py` 2구간 박스 기간 ≥ 하락 기간 1배 → **0.5배**(`BOX_RATIO`) · 장기선 max(112,120,224) → **max(112,224)**. 백테스트(수급·양봉·180일 포함, 시장 대비 20일 초과): 53건 중앙 +2.1%·+10% 도달 47% → 111건 +1.1%·52% (단일 완화 9종 중 채택, 박스 비율 50%안 107건 +1.9%·44%가 차점) · 120선 제외 = 판정 53/53 동일. 손익비는 사용자 「기존안대로」로 무변경(120선·수급·가드·정렬 시뮬레이션만). 탭 문구·CLAUDE.md·기술정리 §5.3 갱신 | `backup/*.bak_bowl3ratio_20261021` |
+| 🍚 밥그릇3 = 3구간 눌림 | 사용자 지시(3구간 눌림 + 토스 수급 + 재무·공시 A안 = 공시만 제외·재무 표시만). `screen_bowl3_quality.py` 전면 교체 — 돌파·눌림 pool 의존 폐지, KRX 캐시로 1·2·3구간 판정 + 첫 눌림 양봉 + 외국인+기관 5일 순매수(토스 Open API `../stock-usa/toss.py`) + 올해 악재 공시 제외, 재무는 `fin_ok` 배지. 출력 형식 유지(탭·Slack·exposure 무수정). `build_bowl3_tab.js` 재무·공시 칸 = 배지 + 설명 문구만. 백테스트(scratchpad, 시장 대비 20일 초과 중앙): 138건 −0.2% → 수급 +0.5% → 양봉 53건 +2.1% → 공시 45건 +1.9% · 재무 필터 시 2건 · 「3구간 첫 음봉」안은 −0.2~−0.9%로 기각. 운영 판정 = 백테스트 이벤트 63/63 일치 확인. 10-21 결과 대상 1(에이팩트, CB 공시 제외) → 0종, 기존 탭 3종(코웨이·NHN KCP·엠에스씨)은 다음 탭 갱신 때 정리됨. 손절 산식(장기선 −1%)은 미변경 | `backup/*.bak_bowl3pull_20261021` · `backup/data/*.bak_bowl3pull_20261021` |
+
+## 2026-10-19
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 🎯 손익비 돌파 도입 | 사용자 지시 ①손익비 룰 조건으로 5종 추출 ②08:30 노출 ③19:00 분석 대상을 이 종목으로 교체 + 15:30 회차 추가 ④15:30 손절 이탈 시 스윙 탭 삭제 + Slack. `screen_rr_breakout.py` 신설(bat [B1g]) · `exposure.js` `rr` 섹션 · `auto_intake.js` 편입 원천 rr 한정·최대 5종·퇴출④ 종가<손절·`--stop-check`(bat [1a]) · 작업 `Dante_Auto_1530`(LeastPrivilege·따라잡기 끔, 관리자 권한 거부로). 결정: 15:00→15:30(종가 확정 시점), 기존 활성 7종 전부 삭제(LG씨엔에스 포함, 사용자 선택), 카드 가격은 §4.4 기계 산식. 첫 편입 = 고영·잇츠한불·엠에스씨·넥센(10-16 확정봉, 조건 통과 4종) | `backup/*.bak_rr_breakout_20261019` |
+| 손절 점검 19:00 추가 | 사용자 지시 「19:00에도 같은 내용으로 한 번 더 · 15:30 삭제는 그대로 두고 19:00에도 손절가 밑이면 삭제」 → bat [1a] 의 HH=15 조건 제거 = full 회차(15:30·19:00)마다 `--stop-check`. 알림 시각 문구도 실행 시각으로 | 같은 백업 |
+| 15:30 = 손절 후보 | 사용자 지시 「15:30 이탈은 삭제 말고 손절 후보로, 19:00에 이탈 중이면 삭제」 → `auto_intake.js` `STOP_PHASE`(17시 전 candidate / 이후 delete): 15:30 이탈 → `stop_candidate` 기록 + Slack ⚠️ 손절 후보, 19:00 이탈 → 퇴출 + Slack 🛑, 회복 → 후보 해제. 시험 `--stop-phase=` | 같은 백업 |
+| 장중 손절 점검 폐지 + D+N | 사용자 지시 「15:30·19:00 손절가 체크 삭제, 08:30만 유지」「등록 후 경과일 D+?」 → bat [1a]·`--stop-check`·손절 후보 코드 삭제(08:30 종가<손절 퇴출은 유지, Slack 🛑 알림은 08:30 손절 퇴출에 붙임) · `auto_intake.js` D+N(경과 거래일) state·카드 배지 · `slack_send.js` 19:00 종목명 뒤 D+N | `backup/*.bak_dplus_20261019` |
+| 대시보드 탭 개편 | 사용자 지시 ①스윙·중장기 탭 삭제 → 「스윙」 탭 = 🎯 손익비 요약표(`#rr-swing-summary`, auto_intake.js 매 회차 갱신·관리 종목 통계를 최신 스캔으로 갱신) + 활성 카드만 ②🌊 눌림·💥 돌파·🧭 테마 탭·버튼·switchTab 항목 삭제 + Slack 노출 줄 삭제(exposure.js). 분석기는 눌림 wrapper 가 없으면 body 끝에 붙이지 않고 건너뜀. 스캐너(눌림·돌파·테마)는 밥그릇3·요약 탭 원천이라 계속 돈다. 업로드 16:0x | `backup/*.bak_tabs_20261019` |
+| 신호 기간 10→15거래일 + HLB글로벌 | 사용자 지시 → `screen_rr_breakout.LB=15`(백테스트 진입 창도 15). 10-16 결과 5종(고영·엠에스씨·넥센·잇츠한불·HLB글로벌 +0.09%), 사용자 지시로 HLB글로벌 즉시 편입. 15:35 분석 JSON 에 HLB 가 없어 verify_sync 불일치(19:00 회차 재분석으로 해소) | `backup/screen_rr_breakout.py.bak_lb15_20261019` |
+| 손익비 A안 + 🍚 밥그릇3 탭 | 사용자 선택 A안: `screen_rr_breakout.dart_screen` = 기대값 순으로 올해 악재 공시 제외(조회 실패는 통과·미확인) + 재무 배지(3개년 매출·순이익 연속 증가) → 요약표 「재무·공시」 열. 10-16 결과 HLB글로벌(전환사채권발행결정) 제외 → 4종. 이미 편입된 HLB글로벌은 요약표에 ⚠️ 표시만(퇴출은 사용자 결정 대기). 밥그릇3 탭 신설 `build_bowl3_tab.js`(bat [B3b]) — 점수 순 5종, 손절은 손익비와 같은 산식, 08:30 갱신, 표시 전용. 헤드리스로 탭 5개 전환·JS 오류 0 확인 후 업로드 | `backup/*.bak_fin_20261019` |
+| HLB글로벌 제외 · 요약표 열 · 카드 숨김 | 사용자 지시: HLB글로벌 규칙대로 제외(퇴출 로그 기록) · 요약표 과거 유사·기대값 삭제 → 2차·3차·재무 표시(state p2·p3 추가) · 종목 카드·필터 패널 화면 숨김(DOM 유지 — 19:00 분석 SSOT). 헤드리스로 보이는 카드 0·JS 오류 0 확인 후 업로드 | `backup/*.bak_cols_20261019` |
+| 충족 점수 열 · 밥그릇3 열 | 사용자 지시: 스윙·밥그릇3 표 종목 앞 「충족」(최신 full 분석 entry_conditions N/M, Slack 19:00 과 같은 값, 🟢/🟡/🔴) · 밥그릇3 비고 삭제·2차·3차 추가 · 테마 줄바꿈. full 회차 분석 직후 bat [2e] `auto_intake.js --summary-only` + `build_bowl3_tab.js` 로 점수 갱신. 밥그릇3 은 분석 대상이 아니라 스윙과 겹치는 종목만 점수 | `backup/*.bak_gate_20261019` |
+| 탭 이름·충족 열 표기 | 사용자 지시: 탭 버튼 「스윙」→「🎯 손익비」(id 유지) · 충족 열 N/M → 조건 이름별 줄바꿈 + 색(🟢 충족·🔴 미충족·⚪ 판정 불가), 손익비·밥그릇3 공용. 헤드리스 스크린샷 확인 | `backup/*.bak_gatenames_20261019` |
+| 밥그릇3 손절 이탈 삭제 + 경과 열 | 사용자 지시 → `build_bowl3_tab.js` 가 `data/bowl3_state.json` 에 첫 진입일 가격 계획 고정, 08:30 KRX 종가 < 손절 → 삭제·Slack 🛑·20거래일 금지, 스캔 탈락·5자리 밖은 정리, 경과 D+N 열. 가짜 상태로 이탈·금지·D+ 시험 후 실상태 생성(4종 D+0) | `backup/build_bowl3_tab.js.bak_stop_20261019` |
+| 밥그릇3 도 손익비처럼 | 사용자 지시 「08:30 밥그릇3 조건 종목 찾아 표로 · 15:30·19:00 손익비처럼 업데이트 · 「스윙」→「손익비」 표기」 → `build_bowl3_tab.js` 가 `data/bowl3_watch.json` 기록 · `toss_capture.load_bowl3_watch`(캡처 추가, stocks.json 불변) · `claude_dante_analyze` tag/category `bowl3`(프롬프트 「진입 기준」·관찰 거래량 규칙·카드 패치 제외·가격 배너 제외) · `slack_send` 08:30 밥그릇3 표 메시지·15:30/19:00 제목 「🎯 손익비」·추천/위험은 active 만. 매집(16:30) 캡처에도 관찰 종목이 붙는다(시간만 늘고 리포트는 보유 종목만) | `backup/*.bak_bowl3watch_20261019` |
+| Slack 08:30 손익비 → 표 | 사용자 지시 → 노출 카드의 🎯 손익비 줄을 table 블록(순위·종목·테마·승률·재무)으로. 나머지 줄 유지. 거부 시 코드 블록 재발송을 아침 회차에도 적용 | `backup/slack_send.js.bak_rrtable_20261019` |
+| Slack 충족표 → 표 | 사용자 지시 「Slack 에도 표로」 → `slack_send.js` 15:30·19:00 보고서의 충족 개수 묶음을 Block Kit table(스윙) + 두 번째 메시지 table(밥그릇3)으로 교체. 메시지당 table 1개 제한 때문에 분리. 거부 시 코드 블록 대체·이미 나간 메시지 재발송 안 함. 웹훅 테스트 1건 200 ok | `backup/slack_send.js.bak_table_20261019` |
+| 종목명 옆 시장 표기 · 수동 회차 | 사용자 지시: 스윙·밥그릇3 표 종목명 옆 코드 → 코스피/코스닥(`auto_intake.marketOf`, 최신 KRX 캐시). 16:47 수동 full 회차(HERMES_RUN_MODE=full --force) — 캡처 4/4·분석·[2e] 요약표·검증 OK·업로드·Slack 발송 | 같은 백업 |
+
+## 2026-10-16
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 👔 임원매수 돌파 기간 60→7거래일 | 사용자 지시 「돌파 후 눌림은 7일 이내로」(중간에 5일로 바꿨다가 7일로 재지시) → `screen_insider_buys.CROSS_WITHIN = 7`. `load_closes` 읽기 범위·최소 길이도 이 값에 연동. 10-16 데이터 결과 **코스피·코스닥 0종목** — 7일 내 돌파 4종(스틱인베스트먼트 장기선 −4.0%·더네이쳐홀딩스 −3.7% = 밴드 −3% 밖, 포스코퓨처엠 −7.6%·적자, 아티스트컴퍼니 적자) 전부 탈락 → Slack 두 줄 「없음」. 밴드 하한 −5% 완화는 사용자 결정 대기. `test_insider_buys.py` 는 `CROSS_WITHIN=60` 고정으로 판정 논리만 시험 | `backup/screen_insider_buys.py.bak_cross5_20261016` |
+| 토요일 08:30 회차 신설 | 사용자 지시 「디커플링 브리프 + 노출 종목을 토요일에도」 → 작업 `Dante_Auto_Sat`(토 08:30, `run_daily_dante.bat --force`, StartWhenAvailable 끔 = `--force` 가 중복 가드도 끄기 때문, RunLevel LeastPrivilege = 관리자 없이 등록). 업로드·🤖자동 편입까지 평일 08:30 과 동일하게 돈다. 금요일 KRX 데이터가 토요일 08:30 에 공개되는지는 미확인(첫 회차 10-17 로그로 확인) | 신규 작업(기존 `Dante_Auto_0815` 무변경) |
+| 공시 필터 호재에 「임원 장내매수」 추가 | 사용자 지시 「회장 말고 간부진·직원 매수」 → `dart_openapi.insider_buys()`(elestock.json → 원문 `장내매수(+)` 행 파싱, 회장·대주주·사외이사 제외, 원문 결과 `data/dart_cache/insider_{접수번호}.json` 영구 캐시) + `collect_theme_flow.apply_disclosure_filter` Step 3 에 호재 1종류(+5, 캡 +15 공유)로 편입 → 눌림·돌파 공통. 배지 `➕ 임원 장내매수 N명 X억`. 시험: SK하이닉스 스톡옵션 행사 제외 확인 · 삼성전자 80→95 | `backup/*.bak_insider_20261016` |
+| 👔 임원매수 조건 B안 | 사용자 선택 B안: 「당기순이익 2년 연속 증가」 → **5일선 112/224 상향돌파(60거래일 내) 후 고점 대비 −5% 이상 눌림 & 종가가 장기선 −3~+5%** + **3개년 흑자**(증가 무관). 10-16 결과 코스피 아모레퍼시픽·아모레퍼시픽홀딩스·한일홀딩스·유한양행·한솔홀딩스 / 코스닥 DMS·에스트래픽. KRX 캐시 읽기 범위가 휴장일 파일 때문에 모자라 224선 판정이 조용히 빠지던 문제 수정(실행 중 발견). 시험 `test_insider_buys.py` | `backup/screen_insider_buys.py.bak_planB_20261016` |
+| 08:30 Slack 「👔 임원매수」 줄 | 사용자 지시 「노출 종목에 코스피/코스닥 나눠 종목명과 테마만」 → `screen_insider_buys.py` 신설(직전 30일 D002 → `insider_buys` → 3개년 흑자 & 당기순이익 2년 연속 증가 → 시장별 매수금액순 5종) + bat [B1f] + `slack_send.js` 노출 카드 끝 2줄. exposure.js 에는 안 넣음(자동 편입 방지). 실행 1분 28초(원문 캐시 후) | `backup/slack_send.js.bak_insider_line_20261016` (bat 은 [B1f] 4줄 추가뿐) |
+| 임원 장내매수 제외 조건 추가 | 사용자 지시 「대표이사 빼고」「대주주급은 안 돼」 → `INSIDER_EXCLUDE_TITLES` 에 「대표」, `INSIDER_MAX_STAKE_PCT=5.0`(보유지분 5% 이상 제외 — SIMPAC 최민영 상무 9.58% 처럼 10% 미만이라 주요주주 표시 안 되는 대주주급). 시험: SIMPAC 제외 확인 | 같은 백업 |
+
+## 2026-10-14
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| slack_send.js 묶음 제목 강조 | 사용자 지시 「충족 3/5 제목 눈에 띄게」 → 묶음마다 `header` 블록(큰 글씨) + 색 이모지(🟢 전부 충족 · 🟡 절반 이상 · 🔴 절반 미만 · ⚪ 판정 없음). 한 section 텍스트 → 묶음별 header+section 블록으로 분리. 18:49 테스트 발송(12:35 분석 JSON · 블록 18개 · 웹훅 ok). 문서 동기화 = `AI단테.md` §4.6.16·§6 10-14 블록 · CLAUDE.md `slack_send.js` 행 · `docs/기술정리.md` 19:00 단계 | `backup/*.bak_gate_header_20261014` |
+| slack_send.js 19:00 활성 섹션 | 사용자 지시: 종목별 상세 카드(유저판단·우량주·추세·수급·AI판단·추천전략) 폐기 → **진입조건 충족 개수별 묶음**(`충족 4/5` …) + 종목마다 항목 표시(가격·양봉·거래량·외국인·프로그램·필수일 때 체결강도, pass=🟢 · fail·unknown=🔴). 데이터 = 분석 JSON `entry_conditions`. 추천·위험 섹션은 그대로 | `backup/slack_send.js.bak_entry_gate_table_20261014` |
+| slack_send.js 종목명 꼬리표 | 종목명 뒤 `(코스피 · 테마)`. 시장 = 최신 KRX 캐시 `*_KOSPI/KOSDAQ.json`, 테마 = `data/naver_theme_map.json`(여러 개면 구성종목 최소 1개 · 끝 괄호 설명 제거) | 같은 백업 |
+| collect_theme_rotation.py 빈 테마 사전 | 버그: 08:33(장 전) 재수집 때 네이버가 구성종목을 빈 목록으로 줘서 264테마 전부 0종으로 저장 → 반도체 분류표 미분류 경고가 조용히 꺼짐(테마 탭 계산은 분류표라 무영향). 전부 0종이면 저장 안 하고 기존 사전 사용. 10:27 재수집 256테마 6,269건 | `backup/collect_theme_rotation.py.bak_empty_map_guard_20261014` · `backup/data/naver_theme_map.json.bak_empty_20261014` |
+| slack_send.js 모바일 형태 (A안) | 🟢/🔴 5칸 나열이 모바일에서 줄 넘침 → 종목마다 2줄 `*종목명*  시장 · 테마` + `❌ 미충족 항목`(다 충족이면 ✅ 전부 충족). 사용자가 3안(A 미충족만 · B 신호등 5칸+범례 · C 조건별 묶음) 중 A 선택 | 같은 백업(충족표 전환 전 원본) |
+| 문서 (§6 결정 기록) | `AI단테.md` §6 에 10-14 블록 추가 — LG씨엔에스 매수 시나리오 재산출 보류(이평 4개 전부 종가 위 · 재산출 조건 종가 > MA20/MA224) + Slack 개편 요약. verify_sync OK | 같은 백업 |
+| 문서 | `AI단테.md` §4.6.16 에 Slack 활성 섹션 새 규칙(충족표 · 위험 종목 존치) · CLAUDE.md `slack_send.js` 행 · 수동 실행 명령을 **bat 전체 경로**로 교체(상대경로가 Git Bash·PowerShell 모두 「인식되지 않음」으로 2회 미실행) · 「네이버 테마 사전만 재수집」 명령 추가 | `backup/AI단테.md.bak_slack_entry_gate_20261014` |
+
+## 2026-10-13
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| auto_intake.js | `--rebuild` 가 라인업에 없는 종목도 받는다(「✋ 수동 지정」 편입). 버그 수정: 재구축 대상이 건너뜀(추세 이탈 등)이면 옛 항목·카드를 먼저 걷어낸 채 사라지던 것 → 시나리오가 선 뒤에만 교체. 라벨 「🔁 T3-U 재구축」→「🔁 재구축」 | `backup/auto_intake.js.bak_20261013` |
+| 후보 분류 코드 삭제 | 사용자 지시 「매집한 종목이 아니면 활성」. §6 `**후보**:` 줄 삭제 · `toss_capture.py` 라인업 태그 항상 `active` · `verify_sync.js` 후보 대조 제거 + `active` 아닌 태그 있으면 발행 차단(변이 시험 확인) · `write_summary.js`·`slack_send.js` 후보 줄·섹션 제거 · 분석 프롬프트 후보 4지·`candidate_status` 제거. 분석기 category 강제 교정 가드는 유지 | `backup/*.bak_nocand_20261013` |
+| 기술 문서 통합 | `docs/기술정리.md` 신설 — CLAUDE.md·AUTOMATION_README·sop·장기이평돌파·돌눌재 보강안·학습진화 루프·레벨업·CHANGELOG·samples 9종의 기술 내용을 현행 기준으로 통합(19:00 단계 순서는 bat 실측으로 보정). 원본은 참고용 보존·수정 안 함, 기술 변경은 통합본에 반영(사용자 결정). CLAUDE.md `docs/` 설명에 명시 | — |
+| 문서 동기화 | AI단테.md §6 헤더 10-13 갱신 + 10-13 블록(동양파일 편입·LG씨엔에스 전환 불가·후보 삭제) · 대시보드 footer 이력 1행 | `backup/*.bak_docupdate_20261013` |
+| 동양파일(228340) | 사용자 지시로 미체결 🤖자동 편입(✋ 수동 지정 · MA60 3,185 앵커 · 1차 3,310/2차 3,270/3차 3,215 · 손절 3,150 · 목표 4,020 · 304주). LG씨엔에스는 추세 이탈(종가 66,300 < MA20·MA60)로 자동 편입 불가 → 기존 「미체결 추적 관찰」 유지 | `backup/*.bak_dongyang_20261013` |
+
+## 2026-10-12
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 🤖 노출 종목 자동 편입 | `auto_intake.js` 신설 + `run_daily_dante.bat` [B3](08:30 회차, B2 뒤 · non-fatal). 노출 종목(눌림·돌파·밥그릇3·테마)을 §6 라인업·stocks.json·스윙 카드에 자동 편입, 시나리오는 §4.3/§4.4 기계 근사(앵커 지지선 → 손절 ×0.99 · 3차 ÷0.98 · 1차 ≤ ×1.04 · 목표 = 스윙 고점 +8~15%). 자동 퇴출 = MA20·60 동시 하회 / 20거래일 미체결 / 목표 초과(🤖자동 라벨 종목만). 상태 `data/auto_intake_state.json` · 이력 `data/auto_intake_log.jsonl` · 자가 점검 `test_auto_intake.js` | `backup/run_daily_dante.bat.bak_autointake_20261012` |
+| 노출 목록 모듈 분리 | `slack_send.js` 의 노출 종목 수집을 `exposure.js` 로 분리(auto_intake 공용 · slack_send 는 require 금지라). 최근 analysis 40개로 Slack 문자열 동일 확인 | `backup/slack_send.js.bak_autointake_20261012` |
+| 대시보드 발행 | 13:21 tes2 업로드(대시보드·AI단테.md·매매일지 · 아카이브는 변경 없음 스킵 · 이미지 미업로드). 공개본 카드 구성이 로컬과 일치 확인. Slack 미발송 — 다음 자동 회차 19:00 | — |
+| 스케줄 표기 정합 | `schtasks` 실측 = `Dante_Auto_0815`(08:30 단일 트리거) · `Dante_Auto_1900` · `Dante_Maejip_1630` · `Dante_Reflect_Monthly`. 10:30·15:10 작업은 10-07부터 미등록(로그도 10-07부터 없음). CLAUDE.md·AUTOMATION_README·SOP·AI단테.md §4.8.5·bat REM·analyze/slack 문구에서 10:30·15:10·08:15 표기 정리(코드 동작 변경 없음) | `backup/*.bak_schedule_20261012` |
+| 활성 정리 | 비에이치아이·보성파워텍 삭제(추세 이탈), 유진테크·산일전기·씨에스윈드 T3-U 재구축(`--rebuild`), 노출 5종 편입. 상세 AI단테.md §6 10-12 블록 | `backup/*.bak_autointake_20261012` |
+
+## 2026-10-01
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 📥 매집 탭 접기·펼치기 | 종목 카드를 `<details>`로 감쌈(기본 접힘, 요약 줄 = 판정·종목·가격·한 줄 요약). 대시보드 `toggleAllCards` 에 `details.maejip-card` 연동 1줄. 10-01 리포트 재렌더 후 발행 | — |
+| 📥 매집 탭 신설 | 스윙 탭 앞 「📥 매집」 + `build_maejip.js`·`run_maejip.bat`·스케줄 `Dante_Maejip_1630`(월~금 16:30, 휴장일 skip, StartWhenAvailable 끔). §6 체결 보유 종목만 대상(사용자 정정: 매집 판정 종목 아님). Claude CLI(`runClaudeCli` export 추가)가 수급 이미지 판독 → 리포트 JSON → 섹션 교체 → 업로드 → Slack ✅/❌. 첫 회 10-01 LG씨엔에스 ⚪ 중립 발행 | `backup/분석_대시보드.html.bak_maejip_20261001` · `backup/upload_dashboard.js.bak_maejip_20261001` |
+| 09:30 슬랙 카드 3장 → 1장 축약 | 눌림·돌파·밥그릇3 상세 카드 → 「📋 노출 종목」 1장(종목명·점수만) + 🧭 테마 줄 추가. 근거: forward 실측 시장대비 20일 초과 중앙값 돌파 −9.3%·눌림 +5.3%(절대 −9.7%)·밥그릇3 −5.6%, 사용자 미열람. 스캐너·대시보드 탭은 유지 | `backup/slack_send.js.bak_compact_card_20261001` |
+| 08:30 재시도 | `check_krx_ready.py`(직전 영업일 KOSPI 행수) 신설 + bat [B-1]: 08:25 전 회차에서 미공개면 morning 마커 삭제·skip 종료 → 08:30 트리거 재시도. cmd 4케이스 모의 검증 | `backup/run_daily_dante.bat.bak_krx_retry_20261001` · `test/archive/20261001_dante_0815/` |
+| 추천 회차 09:30 → 08:15 | 사용자 07:30 요청 → KRX 전일 데이터 공개(~08시) 전이라 08:15로 확정. 스케줄러 재등록(bat 변경 없음, 08시는 원래 recommend) | `test/archive/20261001_dante_0815/` |
+| 🧭 테마 B1e cp949 크래시 수정 | bat 콘솔에서 로그 이모지(🟢)로 UnicodeEncodeError → `theme_rotation_{date}.json` 미저장(10-01 09:30). `sys.stdout.reconfigure(encoding="utf-8")` 추가. 10-01분 수동 재계산(길목 0종) | `backup/collect_theme_rotation.py.bak_cp949_20261001` |
+
+## 2026-09-30
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 🧭 테마 탭 → 반도체 소부장·전공정·후공정 한정 | 네이버 테마 전체 → 종목 분류표 `config/semi_process_map.csv`(네이버 반도체 장비·재료/부품·HBM·기판 합집합 180종 수기 분류: 소부장 43·전공정 35·후공정 55·제외 47, 확인필요 11)의 group 3개를 테마로 사용. 비반도체 추적 풀 15종 삭제. 화면에 범위·그룹별 지표 한 줄 추가(0종 사유 표시). 재생 07-01~09-29: 현행 29종·승률 44% / 테마조건 해제 139종·37% → 현행 유지. 09-29 종가 기준 3그룹 모두 거래대금비 1.5~1.8·고점이라 길목 0종 | `backup/*.bak_semi_20260930` · `backup/*.bak_semimap_20260930` |
+| 대시보드 발행 | 위 테마 탭 수동 재계산(기준 09-29 종가) 후 GitHub(tes2) 업로드 | — |
+
+## 2026-09-29
+
+| 구분 | 내용 | 백업 |
+|---|---|---|
+| 🧭 테마 탭 → 길목 종목 추적 전용 | 주간 상승·하락·눌림 대기 테마 표를 화면에서 제거하고 길목 종목만 표시. 추적 풀 `data/theme_pick_pool.json` 신설 — 편입 후 오늘 조건에서 빠져도 🎓졸업(+10%)·❌이탈(20일선)·⌛만료(20거래일)까지 추적, 끝난 종목은 history 누적·14일 화면 유지·누적 승률 표시. 풀은 09-29 회차(기준 09-28)부터 시작(과거 소급 없음). 9월 재생 참고: 이탈 여유 0%→승률 18%(이탈 55건 중 22건이 2일 내) · 3%→31% · 5%→49% (실패 1건 손실 -3.9%→-6.5%→-9.5%). 여유폭 `REMOVE_BUF_PCT`=0 유지, 변경은 사용자 결정. `test_theme_pool.py` 추가 | `backup/*.bak_pool_20260929` |
+| 🧭 테마 탭 신설 | `collect_theme_rotation.py` → `data/theme_rotation_{날짜}.json` → `claude_dante_analyze.js` `renderThemeSection`(→ `<section id="theme-cards">` 교체). `run_daily_dante.bat` [B1e] 추가(non-fatal). 대시보드에 🧭 테마 버튼·패널·switchTab·CSS 추가. 네이버 테마(모바일 API, `data/naver_theme_map.json` 7일 캐시) × KRX 종가, 달력 주 4개(최근 주 ≤2거래일이면 직전 주에 합침)·구성종목 중앙값·하루 ±35% 이상치 제외. 눌림 대기 테마 = 20일선 위 ≥75% · 거래대금비 ≤0.9 · 고점대비 ≤-2% → 누적순 5개. 길목 종목 = 20일선 위(이격 ≤25%) · 거래대금비 ≤0.9 · 시총 ≥1,000억 · 종가 ≤100만 → 테마당 3종 | `backup/*.bak_theme_20260929` (대시보드 · analyze · bat · upload) |
+| 대시보드 발행 (2차) | 길목 종목 추적 전용 테마 탭 + AI단테.md(docs/ 경로 표기 갱신) GitHub(tes2) 업로드, 공개 URL 반영 확인 | — |
+| 대시보드 발행 (1차) | 테마 탭 포함본 GitHub(tes2) 업로드, 공개 URL 반영 확인. 기준 09-28 종가 | — |
+| 휴장일 수정 | `config/holiday_kr.json` 에서 2026-09-28 삭제 (실제 거래일. 추석 토요일 겹침은 대체휴일 없음) | `backup/config/holiday_kr.json.bak_0928_20260929` |
+| 백업 정리 | 흩어진 `.bak` 148개를 `backup/`(원위치별 `config/`·`data/`)으로 이동. 루트 `stocks.json.bak` 은 toss_capture 현재용이라 제외 | — |
+| 문서 이동 | 코드가 읽지 않는 참고 문서 7개를 `docs/` 로 (AUTOMATION_README · 장기이평돌파 · 돌눌재 보강안 · 레벨업 시스템 · 학습진화 루프 · 모닝브리프 2). AI단테.md 3곳 · sop 2곳 경로 갱신. 빈 파일 `여기서` → backup | `backup/*.bak_docsmove_20260929` |
+| 스크립트 이동 | 비파이프라인 15개를 `tools/`(7) · `tools/levelup/`(8)로. `.env`·ROOT·import·산출물 경로를 한 단계 위 기준으로 보정. 루트 0바이트 `scorecard.json` → backup (실제는 `data/scorecard.json`) | `backup/*.bak_toolsmove_20260929` |
+| 수동 bat 삭제 | run_manual_dante · run_decouple_brief · toss_capture · toss_login · setup_dante_scheduler(.bat/.ps1) · delete_dante_scheduler 7개 삭제. 이후 스케줄 외 실행은 Claude 에게 요청 (명령표 = CLAUDE.md 「수동 실행」) | 없음 (삭제) |
+| 문서 동기화 | `CLAUDE.md` 신설. `docs/AUTOMATION_README.md` 에 09:30 시각 · B0~B1e 단계 · 등록 작업 5개 · 삭제된 bat 대체 안내 반영. 완료 이력은 이 파일로 분리 | `backup/docs/AUTOMATION_README.md.bak_docsync_20260929` · `backup/CLAUDE.md.bak_changelog_20260929` |
+| 종목 | 미체결 5종 시나리오 재구축 (09-28 KRX 확정봉) — 유진테크 · 비에이치아이 · 산일전기 · 씨에스윈드 · 보성파워텍. 활성 6종(체결 1 · 미체결 5) | `backup/*.bak_rebuild_20260929` |
+
+## 2026-09-17
+
+| 구분 | 내용 |
+|---|---|
+| 발행 리포 이전 | `tes1` → `tes2`(공개). `upload_dashboard.js` · `delete_github_images.js` REPO = `tes2` 고정, `.env GITHUB_REPO=tes1` 은 일부러 유지 |
+
+## 2026-09-14
+
+| 구분 | 내용 |
+|---|---|
+| 스케줄 변경 | 아침 회차 08:15 → 09:30 (작업명 `Dante_Auto_0815` 유지). bat 에서 09시도 recommend · morning 슬롯 · pre 라벨로 처리 |
+
+그 이전 이력은 `AUTOMATION_README.md` 머리말·트러블슈팅 표와 각 스크립트 docstring 의 변경 이력 참조.

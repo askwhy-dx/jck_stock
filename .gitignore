@@ -1,0 +1,11 @@
+.env
+.env.local
+data/krx_ohlcv_cache/
+logs/
+data/temp/
+data/dante_analysis_*.json
+data/prices_*.json
+data/holdings_flow_*.json
+data/theme_flow_*.json
+*.pyc
+__pycache__/
