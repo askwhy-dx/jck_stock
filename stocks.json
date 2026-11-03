@@ -1,5 +1,5 @@
 {
-  "_comment": "AI단테.md §6 자동 동기화 (toss_capture.py 갱신 · 활성 3종). 사용자가 §6 갱신 시 다음 회차에 자동 반영.",
+  "_comment": "AI단테.md §6 자동 동기화 (toss_capture.py 갱신 · 활성 4종). 사용자가 §6 갱신 시 다음 회차에 자동 반영.",
   "stocks": [
     {
       "name": "미원상사",
@@ -14,6 +14,11 @@
     {
       "name": "두올",
       "code": "016740",
+      "tag": "active"
+    },
+    {
+      "name": "큐알티",
+      "code": "405100",
       "tag": "active"
     }
   ]

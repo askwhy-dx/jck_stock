@@ -314,16 +314,16 @@ const rrStats = r => ({ signal_date: r.signal_date, themes: r.themes, n: r.n, wi
 const finCell = r => !r ? '-' : r.disclosure && r.disclosure.startsWith('악재') ? `⚠️ ${r.disclosure}` : r.fin_ok === true ? '✅ 3년 성장' : r.fin_ok === false ? `❌ ${r.fin}` : (r.fin || '-');
 
 // 스윙 탭 맨 위 🎯 손익비 요약표 (2026-10-19 · 스윙/중장기 탭 개편) — 매 회차 state 로 다시 그린다
-const SUMMARY_RE = /<section id="rr-swing-summary">[\s\S]*?<\/section>\n?/;
+const SUMMARY_RE = /<section id="rr-swing-summary"[^>]*>[\s\S]*?<\/section>\n?/;
 function renderSwingSummary(state) {
   const rows = Object.entries(state.managed).filter(([, m]) => m.p1)
     .sort((a, b) => (b[1].rr?.ev_pct ?? -99) - (a[1].rr?.ev_pct ?? -99));
   const td = (l, v) => `<td data-label="${l}">${v}</td>`;
   const gs = gateScores();
   const body = rows.map(([code, m], i) => `      <tr>${td('순위', i + 1)}${td('충족', gateCell(gs[code]))}${td('종목', `<strong>${m.name}</strong> <span class="hd-note">${marketOf(code)}</span>`)}${td('테마', (m.rr?.themes || []).slice(0, 3).join('<br>') || '-')}${td('경과', `D+${m.dplus ?? 0}`)}${td('신호일', m.rr ? `${m.rr.signal_date.slice(4, 6)}-${m.rr.signal_date.slice(6)}` : '-')}${td('1차', fmt(m.p1))}${td('2차', m.p2 ? fmt(m.p2) : '-')}${td('3차', m.p3 ? fmt(m.p3) : '-')}${td('손절', fmt(m.stop))}${td('목표', fmt(m.target))}${td('손절 폭', `−${((1 - m.stop / m.p1) * 100).toFixed(1)}%`)}${td('손익비', m.rr1 ?? '-')}${td('승률', m.rr ? `${Math.round(m.rr.win * 100)}%` : '-')}${td('재무·공시', finCell(m.rr))}</tr>`).join('\n');
-  // 종목 카드는 화면에서 숨김(2026-10-19 사용자 지시) — 19:00 분석이 카드의 진입 조건을 SSOT 로 읽으므로 DOM 에는 남긴다
-  return `<section id="rr-swing-summary">
-  <style>#tab-swing .card[id$="-active"],#stock-filter-panel{display:none!important}</style>
+  // 🤖자동 관리 종목 카드만 숨김(2026-10-19 사용자 지시 · 26-11-03 체결 보유 카드는 표시) — 19:00 분석이 카드의 진입 조건을 SSOT 로 읽으므로 DOM 에는 남긴다
+  return `<section id="rr-swing-summary" data-auto="${rows.map(([c]) => c).join(",")}">
+  <style>${[...rows.map(([c]) => `#card-${c}-active`), "#stock-filter-panel"].join(",")}{display:none!important}</style>
   <h3 style="margin:8px 0;">🎯 손익비 돌파 <span class="hd-note">(최대 5종 · 08:30 KRX 확정봉 · 손절 = 돌파선 −1% 종가 · 손절 폭 2~5% · 매 회차 종가 &lt; 손절이면 삭제)</span></h3>
   <table class="stock-table" style="font-size:0.88em;">
     <thead><tr><th>순위</th><th>충족</th><th>종목</th><th>테마</th><th>경과</th><th>신호일</th><th>1차</th><th>2차</th><th>3차</th><th>손절</th><th>목표</th><th>손절 폭</th><th>손익비</th><th>승률</th><th>재무·공시</th></tr></thead>

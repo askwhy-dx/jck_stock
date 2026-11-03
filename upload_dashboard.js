@@ -167,7 +167,7 @@ function scanImages() {
 }
 
 (async () => {
-  const commitMsg = `2026-10-29 활성 0종 SSOT 복구 및 현재 시각 종목 분석 갱신.`;
+  const commitMsg = `2026-11-03 💼 매입 탭을 손익비 왼쪽으로 이동.`;
 
   console.log(`=== [1/4] financial/ 경로 업로드 (HTML + MD 3-tier) ===`);
   const results = [];

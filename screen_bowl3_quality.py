@@ -15,7 +15,7 @@ KRX 캐시 전 종목에서 밥그릇 1·2구간을 거쳐 3구간으로 출발(
   재무         : 3개년 매출·순이익 연속 증가 — **표시만**(fin_ok 배지, 탈락 아님 · 사용자 A안)
   가드         : 상장주식수 30% 넘게 바뀐 종목(분할·병합·감자) 제외 · 같은 종목 180일 안 재신호 제외
 
-노출 기간 = 눌림일부터 20거래일 (백테스트 측정 기간). score = 수급 강도(외국인+기관 5일 순매수 ÷ 20일 평균 거래량, %) — 정렬용.
+노출 기간 = 눌림일부터 60거래일 (26-11-03 20→60 · 백테스트 측정 기간은 20거래일). score = 수급 강도(외국인+기관 5일 순매수 ÷ 20일 평균 거래량, %) — 정렬용.
 
 근거 (2026-10-21 백테스트, KRX 2022-10~2026-10 · 시장 대비 20일 초과수익 중앙값):
   1·2·3구간 눌림 138건 −0.2% → +수급 107건 +0.5% → +양봉 53건 +2.1% → +공시 45건 +1.9%.
@@ -55,7 +55,7 @@ sys.path.insert(0, str(ROOT.parent / "jck_stock-usa"))   # 토스 Open API 클�
 
 DROP, PEAK_LB, BOX_BELOW, BOX_RATIO, VOL_X, CAP = 0.40, 500, 0.70, 0.5, 1.5, 1e11
 PB_DAYS, PB_LO, PB_HI, RUN_MAX = 20, -0.01, 0.05, 0.20
-SHOW_DAYS, DEDUP_DAYS, FLOW_DAYS = 20, 180, 5
+SHOW_DAYS, DEDUP_DAYS, FLOW_DAYS = 60, 180, 5   # SHOW_DAYS 20→60 (26-11-03 사용자 지시)
 
 
 def log(msg: str):
@@ -141,7 +141,7 @@ def run(dry_run: bool):
             continue
         n = len(rows)
         for e in find_pullbacks(rows):
-            if e["k"] >= n - SHOW_DAYS:   # 눌림일이 최근 20거래일 안
+            if e["k"] >= n - SHOW_DAYS:   # 눌림일이 최근 SHOW_DAYS(60)거래일 안
                 cands.append(dict(code=code, name=names[code], market=markets[code], close=rows[-1][4],
                                   cap=rows[-1][6], dplus=n - 1 - e["k"], **e))
     log(f"KRX {last} · 3구간 눌림(양봉) 최근 {SHOW_DAYS}거래일 {len(cands)}종 → 수급·공시 심사")
