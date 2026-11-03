@@ -1,9 +1,19 @@
 {
-  "_comment": "AI단테.md §6 자동 동기화 (toss_capture.py 갱신 · 활성 1종). 사용자가 §6 갱신 시 다음 회차에 자동 반영.",
+  "_comment": "AI단테.md §6 자동 동기화 (toss_capture.py 갱신 · 활성 3종). 사용자가 §6 갱신 시 다음 회차에 자동 반영.",
   "stocks": [
     {
       "name": "미원상사",
       "code": "002840",
+      "tag": "active"
+    },
+    {
+      "name": "계룡건설",
+      "code": "013580",
+      "tag": "active"
+    },
+    {
+      "name": "두올",
+      "code": "016740",
       "tag": "active"
     }
   ]
