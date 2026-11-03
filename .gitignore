@@ -9,3 +9,4 @@ data/holdings_flow_*.json
 data/theme_flow_*.json
 *.pyc
 __pycache__/
+toss_session/
