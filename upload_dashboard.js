@@ -167,7 +167,7 @@ function scanImages() {
 }
 
 (async () => {
-  const commitMsg = `2026-11-05 밥그릇3 탭 현재가 = 최신 종가 (전일 KRX봉 표시 수정)`;
+  const commitMsg = `2026-11-05 밥그릇3 장기선 이탈 삭제 조건 추가 (종가 < max MA112·224 −1%)`;
 
   console.log(`=== [1/4] financial/ 경로 업로드 (HTML + MD 3-tier) ===`);
   const results = [];

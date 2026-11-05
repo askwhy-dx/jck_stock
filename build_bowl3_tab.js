@@ -39,9 +39,10 @@ function themeOf() {
 //   KRX 종가 < 저장 손절 → 탭에서 삭제 + Slack 🛑 + BAN_DAYS 거래일 재진입 금지. 스캔에서 빠진 종목은 조용히 정리.
 const STATE = path.join(ROOT, 'data', 'bowl3_state.json');
 const BAN_DAYS = 20;
+const LINE_TOL = 0.99; // 종가 < 장기선 × 0.99 → 삭제·편입 제외 (스캐너 눌림 판정 c >= top*0.99 와 같은 폭)
 
 function notifyExits(exits) {
-  const text = `🛑 *손절·목표 이탈 — 밥그릇3에서 삭제* (${exits.length}종)\n${exits.map(e => `• *${e.name}* (${e.code}) — ${e.why}`).join('\n')}`;
+  const text = `🛑 *손절·목표·장기선 이탈 — 밥그릇3에서 삭제* (${exits.length}종)\n${exits.map(e => `• *${e.name}* (${e.code}) — ${e.why}`).join('\n')}`;
   if (DRY) { log(`--dry-run: Slack 생략\n${text}`); return Promise.resolve(); }
   require('dotenv').config({ path: path.join(ROOT, '..', '.env') });
   const url = process.env.SLACK_WEBHOOK_URL;
@@ -59,6 +60,15 @@ function main() {
   const state = fs.existsSync(STATE) ? JSON.parse(fs.readFileSync(STATE, 'utf-8')) : { managed: {}, banned: {} };
   const bars = krxBars([...new Set([...passed.map(r => r.code), ...Object.keys(state.managed)])]);
   const since = (code, krxDate) => (bars[code] || []).filter(r => r.date > krxDate).length;
+  // 장기선 = max(MA112, MA224), 최신 종가를 붙여 다시 계산 (26-11-05 사용자 지시: 노출 중 종가 < 장기선 −1% 이면 삭제)
+  const longLine = (code, last) => {
+    const cl = (bars[code] || []).map(r => r.close);
+    if (last && last.date > ((bars[code] || []).at(-1)?.date || '')) cl.push(last.close);
+    if (cl.length < 224) return null;
+    const ma = n => cl.slice(-n).reduce((s, x) => s + x, 0) / n;
+    return Math.max(ma(112), ma(224));
+  };
+  const belowLine = (code, last) => { const L = last && longLine(code, last); return L && last.close < L * LINE_TOL ? L : null; };
   const exits = [];
 
   // ① 관리 중 종목: 손절 이탈 → 삭제·금지 / 스캔에서 빠짐 → 정리 / 아니면 D+ 갱신
@@ -71,6 +81,10 @@ function main() {
     } else if (last && m.target && last.close > m.target) { // 목표 이탈 삭제 (2026-10-28)
       exits.push({ code, name: m.name, why: `종가 ${fmt(last.close)} > 목표 ${fmt(m.target)} (${last.date.slice(4, 6)}-${last.date.slice(6)} 종가)` });
       state.banned[code] = { name: m.name, exit_krx_date: last.date };
+      delete state.managed[code];
+    } else if (belowLine(code, last)) { // 장기선 이탈 삭제 (2026-11-05) — 재진입 금지 없음: 선 위로 돌아오면 다시 들어온다
+      const L = belowLine(code, last);
+      exits.push({ code, name: m.name, why: `종가 ${fmt(last.close)} < 장기선 ${fmt(Math.round(L))} −1% (${last.date.slice(4, 6)}-${last.date.slice(6)} 종가)` });
       delete state.managed[code];
     } else if (!passed.some(r => r.code === code)) {
       log(`정리 ${m.name}(${code}) — 오늘 밥그릇3 스캔에서 빠짐`);
@@ -88,7 +102,9 @@ function main() {
     if (!m) {
       const sc = scenario(bars[r.code] || [], '112+224');
       if (!sc.ok) { log(`건너뜀 ${r.name}(${r.code}) — ${sc.reason}`); continue; }
-      if (sc.x.C > sc.target) { log(`건너뜀 ${r.name}(${r.code}) — 종가 ${fmt(sc.x.C)} > 목표 ${fmt(sc.target)}`); continue; }
+      const cur = lastClose(r.code, bars[r.code]) || { close: sc.x.C, date: sc.x.date }; // 최신 종가로 판정 (26-11-05)
+      if (cur.close > sc.target) { log(`건너뜀 ${r.name}(${r.code}) — 종가 ${fmt(cur.close)} > 목표 ${fmt(sc.target)}`); continue; }
+      if (belowLine(r.code, cur)) { log(`건너뜀 ${r.name}(${r.code}) — 종가 ${fmt(cur.close)} < 장기선 −1%`); continue; }
       m = state.managed[r.code] = { name: r.name, first_date: today, first_krx_date: sc.x.date, dplus: 0,
         p1: sc.p1, p2: sc.p2, p3: sc.p3, stop: sc.stop, target: sc.target, rr1: +sc.rr1.toFixed(2), vol: sc.vol };
     }
@@ -112,7 +128,7 @@ function main() {
 ${rows.join('\n') || '      <tr><td colspan="15">없음</td></tr>'}
     </tbody>
   </table>
-  <p class="hd-note">밥그릇3 = 3구간 눌림 — 1구간(−40% 하락) · 2구간(하락 기간 0.5배 이상 박스) 뒤 장기선(112·224) 동시 돌파 후 20거래일 안 장기선까지 첫 눌림 + 양봉 + 외국인·기관 5일 순매수 + 올해 악재 공시 0건 (재무 3년 성장은 표시만) · 점수 = 외국인+기관 5일 순매수 ÷ 20일 평균 거래량(%) · 눌림일부터 60거래일 노출 · 충족 = 최신 16:30·19:00 분석 기준 매수 판정(가격 + 거래량·외국인·프로그램 3개 중 3개 🟢 매수 · 2개 🟡 매수가능 · 그 외 ⚪ 대기, 양봉은 참고) + 조건별 판정(🟢 충족 · 🔴 미충족 · ⚪ 판정 불가) · 경과 D+N = 탭에 들어온 뒤 거래일 · 1차·2차·3차·손절·목표는 들어온 날 §4.4 기계 산식으로 고정 · 매 회차(08:30·16:30·19:00) 최신 종가 &lt; 손절 또는 &gt; 목표면 삭제(Slack 알림) 후 ${BAN_DAYS}거래일 재진입 금지 · 표시 전용(스윙 탭 자동 편입 아님)</p>
+  <p class="hd-note">밥그릇3 = 3구간 눌림 — 1구간(−40% 하락) · 2구간(하락 기간 0.5배 이상 박스) 뒤 장기선(112·224) 동시 돌파 후 20거래일 안 장기선까지 첫 눌림 + 양봉 + 외국인·기관 5일 순매수 + 올해 악재 공시 0건 (재무 3년 성장은 표시만) · 점수 = 외국인+기관 5일 순매수 ÷ 20일 평균 거래량(%) · 눌림일부터 60거래일 노출 · 충족 = 최신 16:30·19:00 분석 기준 매수 판정(가격 + 거래량·외국인·프로그램 3개 중 3개 🟢 매수 · 2개 🟡 매수가능 · 그 외 ⚪ 대기, 양봉은 참고) + 조건별 판정(🟢 충족 · 🔴 미충족 · ⚪ 판정 불가) · 경과 D+N = 탭에 들어온 뒤 거래일 · 1차·2차·3차·손절·목표는 들어온 날 §4.4 기계 산식으로 고정 · 매 회차(08:30·16:30·19:00) 최신 종가 &lt; 손절 또는 &gt; 목표면 삭제(Slack 알림) 후 ${BAN_DAYS}거래일 재진입 금지 · 최신 종가 &lt; 장기선(max MA112·224) −1% 이면 삭제·편입 제외(재진입 금지 없음 — 선 위로 돌아오면 다시 들어옴) · 표시 전용(스윙 탭 자동 편입 아님)</p>
 </section>`;
   let html = fs.readFileSync(HTML, 'utf-8');
   if (!SEC_RE.test(html)) throw new Error('#bowl3-tab-summary 없음 (밥그릇3 탭 마크업 확인)');
