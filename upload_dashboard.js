@@ -167,7 +167,7 @@ function scanImages() {
 }
 
 (async () => {
-  const commitMsg = `2026-11-05 큐알티 3주 @14,366 전량 손절 종결 (매입 카드 삭제 · 종료 탭·매매일지 39건 백필)`;
+  const commitMsg = `2026-11-05 밥그릇3 탭 현재가 = 최신 종가 (전일 KRX봉 표시 수정)`;
 
   console.log(`=== [1/4] financial/ 경로 업로드 (HTML + MD 3-tier) ===`);
   const results = [];

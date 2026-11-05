@@ -92,7 +92,7 @@ function main() {
       m = state.managed[r.code] = { name: r.name, first_date: today, first_krx_date: sc.x.date, dplus: 0,
         p1: sc.p1, p2: sc.p2, p3: sc.p3, stop: sc.stop, target: sc.target, rr1: +sc.rr1.toFixed(2), vol: sc.vol };
     }
-    top.push({ r, m, close: (bars[r.code] || []).at(-1)?.close });
+    top.push({ r, m, close: lastClose(r.code, bars[r.code])?.close }); // 현재가 = 최신 종가(손절 판정과 같은 값, 26-11-05: KRX 캐시 전일봉이라 충족 판정과 어긋났음)
   }
   // 5자리 밖으로 밀린 관리 종목은 정리 (다음에 다시 들어오면 새로 산출)
   for (const code of Object.keys(state.managed)) if (!top.some(t => t.r.code === code)) delete state.managed[code];
