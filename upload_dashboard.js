@@ -167,7 +167,7 @@ function scanImages() {
 }
 
 (async () => {
-  const commitMsg = `2026-11-05 밥그릇3 장기선 이탈 삭제 조건 추가 (종가 < max MA112·224 −1%)`;
+  const commitMsg = `2026-11-06 하이록코리아 1차 체결 3주 @30,850 매입 등록`;
 
   console.log(`=== [1/4] financial/ 경로 업로드 (HTML + MD 3-tier) ===`);
   const results = [];

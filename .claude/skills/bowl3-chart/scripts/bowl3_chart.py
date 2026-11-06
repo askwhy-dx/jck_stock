@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """밥그릇3 설명 차트 — 스캐너와 같은 판정으로 구간·조건을 다시 계산해 PNG 1장으로 그린다.
 
-사용: python -X utf8 bowl3_chart.py <코드|종목명> --out <png> [--pull YYYYMMDD] [--notes notes.json]
+사용: python -X utf8 bowl3_chart.py <코드|종목명> --out <png> [--pull YYYYMMDD] [--notes notes.json] [--no-scen]
+  · 기본(26-11-06 확정) = 오른쪽에 앞으로 20거래일 A·B·C 예시 경로(가격 계획·탭 퇴출 규칙 기준, 확률 아님)
   · 표준출력 마지막 줄 = 사실 JSON (설명 문구는 이 값만 쓴다)
   · notes.json = {"title": "...", "read": ["줄", ...], "warn": ["줄", ...]}  (없으면 해당 상자 생략)
 """
@@ -15,6 +16,7 @@ import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from screen_rr_breakout import load, ma
+import scenario_lib as SL
 from screen_bowl3_quality import find_pullbacks, PEAK_LB, DROP, BOX_RATIO, BOX_BELOW, VOL_X
 
 plt.rcParams["font.family"] = "Malgun Gothic"; plt.rcParams["axes.unicode_minus"] = False
@@ -24,7 +26,8 @@ md = lambda d: f"{d[4:6]}-{d[6:]}"
 
 ap = argparse.ArgumentParser()
 ap.add_argument("stock"); ap.add_argument("--out", required=True)
-ap.add_argument("--pull"); ap.add_argument("--notes")
+ap.add_argument("--pull"); ap.add_argument("--notes"); ap.add_argument("--scen", action=argparse.BooleanOptionalAction, default=True)
+ap.add_argument("--live", action="store_true")   # 스케줄: 토스 오늘 봉 붙임 + 시나리오 처음 1회 저장(data/scenario_state.json)   # 26-11-06 사용자 확정: 기본 = 시나리오 포함
 A = ap.parse_args()
 
 bars, names, _ = load()
@@ -32,6 +35,9 @@ code = A.stock if A.stock in bars else next((c for c, n in names.items() if n ==
 if not code:
     sys.exit(f"종목 없음: {A.stock}")
 rows = sorted(bars[code]); name = names[code]
+BASIS = f"KRX {rows[-1][0][4:6]}-{rows[-1][0][6:]} 종가"
+if A.live:
+    rows, BASIS = SL.with_today(name, rows)
 evs = find_pullbacks(rows)
 if A.pull:
     evs = [e for e in evs if e["pull_date"] == A.pull]
@@ -75,23 +81,42 @@ F = dict(code=code, name=name, krx_last=D[n],
 notes = json.load(open(A.notes, encoding="utf-8")) if A.notes else {}
 
 # ── 차트 ──
-w0 = max(0, p - 20); X = np.arange(w0, n + 1); ix = lambda i: i - w0
-lo, hh = l[w0:].min(), h[w0:].max(); pad = (hh - lo)
+w0 = max(0, p - 20); X = np.arange(w0, n + 1)
+sc = J = None
+if A.scen and plan:   # 시나리오 = 처음 잡힌 날(탭 편입일) 고정 — 있으면 재사용, 없으면 만들고 --live 때만 저장
+    S_ = SL.load_state(); sc = S_.get(code)
+    if not sc or sc["base_date"] not in D:
+        bd = plan.get("first_krx_date") if plan.get("first_krx_date") in D else D[n]
+        sc = SL.make("bowl3", name, plan, bd, float(c[D.index(bd)]), D[k], 60)   # 기한 = 눌림일 + 60거래일 (build_bowl3_tab)
+        if A.live:
+            S_[code] = sc; SL.save_state(S_)
+    J = SL.judge(sc, D, h, l, c, code)
+FUT = SL.FUT if sc else 0
+bs = D.index(sc["base_date"]) if sc else n
+SC = max(1.0, (bs - w0) * 0.45 / FUT) if FUT else 1   # 시나리오 1거래일 폭 — 긴 차트에서도 시나리오 구간이 화면 약 1/4
+ix = SL.xmap(w0, bs, SC)
+FW = max(FUT, n - bs + 2) * SC if FUT else 0; XR = ix(bs) + FW + (12 * SC if FUT else 14)   # 오른쪽 끝
+lv = [plan["stop"] * 0.99, plan["target"] * 1.02, *[y for q in sc["paths"].values() for _, y in q]] if FUT else []
+lo, hh = min([l[w0:].min(), *lv]), max([h[w0:].max(), *lv]); pad = (hh - lo)
 fig = plt.figure(figsize=(17, 10.5), dpi=130)
 ax = fig.add_axes([0.045, 0.30, 0.63, 0.62]); vx = fig.add_axes([0.045, 0.08, 0.63, 0.20], sharex=ax)
 for i in X:
     col = "#d62728" if c[i] >= o[i] else "#1f77b4"
-    ax.vlines(ix(i), l[i], h[i], color=col, lw=0.8)
-    ax.add_patch(Rectangle((ix(i) - 0.35, min(o[i], c[i])), 0.7, max(abs(c[i] - o[i]), pad * 0.002), color=col))
-    vx.bar(ix(i), v[i], color=col, width=0.7)
-ax.plot(X - w0, m112[w0:], color="#ff9f1c", lw=2, label="112일선"); ax.plot(X - w0, m224[w0:], color="#7b2cbf", lw=2, label="224일선")
+    wk = 0.7 * (SC if i > bs else 1)   # 시나리오 구간 봉은 칸 폭만큼 넓게
+    ax.vlines(ix(i), l[i], h[i], color=col, lw=0.8 if i <= bs else 1.6)
+    ax.add_patch(Rectangle((ix(i) - wk / 2, min(o[i], c[i])), wk, max(abs(c[i] - o[i]), pad * 0.002), color=col))
+    vx.bar(ix(i), v[i], color=col, width=wk)
+XS = [ix(i) for i in X]
+ax.plot(XS, m112[w0:], color="#ff9f1c", lw=2, label="112일선"); ax.plot(XS, m224[w0:], color="#7b2cbf", lw=2, label="224일선")
 ylo, yhi = lo - pad * 0.18, hh + pad * 0.16; ty = hh + pad * 0.09
+placed = []
 for s, e2, col, txt in [(p, t, "#1f77b4", f"1구간 하락 · {t - p}거래일"), (t, b, "#999999", f"2구간 바닥 · {b - t}거래일"),
                         (b, n, "#2ca02c", "3구간 돌파 → 눌림 → 현재")]:
     ax.axvspan(ix(s), ix(e2), color=col, alpha=0.08)
-    ax.text(ix((s + e2) / 2) if col != "#2ca02c" else ix(n), ty, txt, ha="center" if col != "#2ca02c" else "right", fontsize=12, weight="bold", color="#555" if col == "#999999" else col)
+    # 3구간이 좁으면(40거래일 미만) 2구간 제목과 겹치므로 한 줄 내림
+    ax.text(ix((s + e2) / 2) if col != "#2ca02c" else ix(n), ty - (pad * 0.05 if col == "#2ca02c" and n - b < 40 else 0), txt, ha="center" if col != "#2ca02c" else "right", fontsize=12, weight="bold", color="#555" if col == "#999999" else col)
+    ax.set_xlim(-2, XR); ax.set_ylim(ylo, yhi); r_ = fig.canvas.get_renderer(); placed.append(ax.texts[-1].get_window_extent(r_).expanded(1.05, 1.3))
 
-placed = []
 def note(i, y, txt, col, tries):
     """tries = (dx, dy) 후보 — 앞 상자와 안 겹치고 차트 안에 드는 첫 자리"""
     r = fig.canvas.get_renderer(); box = ax.get_window_extent(r); first_in = None
@@ -107,32 +132,35 @@ def note(i, y, txt, col, tries):
     else:   # 빈자리 없음 → 차트 안 첫 자리(겹침 허용), 그것도 없으면 첫 후보
         dx, dy = first_in or tries[0]
     placed.append(tb(mk(i, y, txt, col, dx, dy), r))
-tb = lambda an, r: (an.update_positions(r), an.get_bbox_patch().get_window_extent(r).expanded(1.08, 1.2))[1]   # 글상자만(화살표 제외)
+tb = lambda an, r: (an.draw(r), an.get_bbox_patch().get_window_extent(r).expanded(1.08, 1.2))[1]   # 글상자만(화살표 제외) · draw 전엔 상자 크기가 1px 더미라 반드시 draw 뒤에 잰다
 def mk(i, y, txt, col, dx, dy):
     return ax.annotate(txt.translate(FIX), (ix(i), y), xytext=(dx, dy), textcoords="offset points", fontsize=10.5, color=col,
                        weight="bold", ha="left" if dx >= 0 else "right", va="center", arrowprops=dict(arrowstyle="->", color=col, lw=1.4),
                        bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=col))
 UP = [(25, 30), (-25, 30), (25, 90), (-25, 90), (40, 150), (-40, 150)]
 DN = [(25, -60), (-25, -60), (25, -120), (-25, -120), (40, -180), (-40, -180)]
-ax.set_xlim(-2, ix(n) + 14); ax.set_ylim(ylo, yhi)
+ax.set_xlim(-2, XR); ax.set_ylim(ylo, yhi)
 note(p, h[p], f"① 고점 {f0(h[p])} ({md(D[p])})", "#1f77b4", [(25, 5)] + DN)
 note(t, l[t], f"② 저점 {f0(l[t])} ({md(D[t])})\n고점 대비 -{F['trough']['drop_pct']}%", "#1f77b4", [(30, 50)] + UP)
 note(n, c[n], f"⑥ {md(D[n])} 종가 {f0(c[n])} ({F['last']['chg_pct']:+}%)\n장기선({f0(top[n])}) {F['last']['vs_line_pct']:+}%",
-     "#000000", [(-60, -100), (-60, -170), (-60, 100), (-60, 170), (-200, -100), (-200, 100)])
+     "#000000", ([(40, -110), (40, 110)] if FUT else []) + [(-60, -100), (-60, -170), (-60, 100), (-60, 170), (-200, -100), (-200, 100)])
 if hi > k + 1 and hi < n - 1:
     note(hi, h[hi], f"⑤ {md(D[hi])} 고점 {f0(h[hi])}\n눌림일 종가 대비 {F['after_high']['vs_pull_close_pct']:+}%", "#d62728", [(-30, 25)] + UP)
 note(b, c[b], f"③ {md(D[b])} 장기선 돌파\n양봉 · 거래량 {F['breakout']['vol_x']}배", "#d62728",
      [(-40, 110), (-40, 170), (-120, 60), (-40, -150), (-160, -110), (-40, 230)])
 note(k, l[k], f"④ {md(D[k])} 첫 눌림 양봉\n저가가 선 {F['pull']['low_vs_line_pct']:+}%", "#2ca02c", [(20, -95), (-20, -95), (60, -45), (-60, -45)] + DN + UP)
-if plan:
-    x0 = ix(max(k, n - 25)) / (ix(n) + 14 + 2)
+if sc:
+    SL.draw_future(ax, sc, J, ix, bs, SC, ylo, pad, f0)
+elif plan:
+    x0 = ix(max(k, n - 25)) / (XR + 2)
     ax.axhspan(plan["p3"], plan["p1"], xmin=x0, color="#ffd60a", alpha=0.45)
     for y, lab, col in [(plan["p1"], f"1차 {f0(plan['p1'])}", "#b8860b"), (plan["stop"], f"손절 {f0(plan['stop'])}", "#d62728"),
                         (plan["target"], f"목표 {f0(plan['target'])}", "#2ca02c")]:
         ax.axhline(y, xmin=x0, color=col, ls="--", lw=1.3); ax.text(ix(n) + 1, y, lab, va="bottom", fontsize=9.5, color=col)
 ax.legend(loc="lower left", fontsize=11); ax.grid(alpha=0.25)
 ax.set_title((notes.get("title") or f"{name}({code}) — 밥그릇3 (눌림 {md(D[k])})").translate(FIX), fontsize=17, weight="bold", loc="left")
-st = max(10, len(X) // 140 * 10); tk = [i for i in X if (i - w0) % st == 0]; vx.set_xticks([ix(i) for i in tk]); vx.set_xticklabels([md(D[i]) for i in tk], fontsize=9)
+st = max(10, int(np.ceil(XR / 18 / 10)) * 10 if FUT else len(X) // 140 * 10)
+tk = [i for i in X if i <= bs and (i - w0) % st == 0] + [i for i in X if i > bs and ((i - bs) % max(1, round(st / SC)) == 0 or i == n)]; vx.set_xticks([ix(i) for i in tk]); vx.set_xticklabels([md(D[i]) for i in tk], fontsize=9)
 plt.setp(ax.get_xticklabels(), visible=False); vx.set_ylabel("거래량"); vx.grid(alpha=0.25)
 vx.text(ix(b), v[b], f" {F['breakout']['vol_x']}배", fontsize=9, color="#d62728", va="bottom", weight="bold")
 
@@ -155,9 +183,16 @@ for j, (m, a_, val) in enumerate(rows_):
     y = 0.93 - j * 0.052
     sd.text(0, y, m, fontsize=13, weight="bold", color={"O": "#2ca02c", "X": "#d62728"}.get(m, "#999"))
     sd.text(0.07, y, a_, fontsize=10.5); sd.text(0.07, y - 0.022, str(val).translate(FIX), fontsize=10, color="#555")
+ry = 0.535
+if sc:
+    sd.text(0, ry, f"시나리오 진행 ({BASIS})", fontsize=13, weight="bold", color="#b8860b")
+    SLN = SL.status_lines(sc, J, f0, "체결 없이 종가 > 목표 또는 눌림+60일 → 탭 삭제")
+    for j, (col, t_) in enumerate(SLN):
+        sd.text(0.01, ry - 0.03 - j * 0.026, t_, fontsize=10, color=col, weight="normal" if col == "#555" else "bold")
+    ry -= 0.05 + len(SLN) * 0.026
 if notes.get("read"):
-    sd.text(0, 0.535, "어떻게 읽나", fontsize=13, weight="bold", color="#2ca02c")
-    sd.text(0, 0.51, "\n".join("· " + s for s in notes["read"]).translate(FIX), fontsize=10.2, va="top", linespacing=1.45)
+    sd.text(0, ry, "어떻게 읽나", fontsize=13, weight="bold", color="#2ca02c")
+    sd.text(0, ry - 0.025, "\n".join("· " + s for s in notes["read"]).translate(FIX), fontsize=10.2, va="top", linespacing=1.45)
 if notes.get("warn"):
     sd.add_patch(Rectangle((-0.02, 0.0), 1.02, 0.2, fc="#fff3cd", ec="#e0a800", transform=sd.transAxes))
     sd.text(0.01, 0.18, "주의할 점", fontsize=13, weight="bold", color="#b8860b")
