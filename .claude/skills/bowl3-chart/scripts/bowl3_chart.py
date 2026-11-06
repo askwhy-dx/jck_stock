@@ -160,7 +160,8 @@ elif plan:
 ax.legend(loc="lower left", fontsize=11); ax.grid(alpha=0.25)
 ax.set_title((notes.get("title") or f"{name}({code}) — 밥그릇3 (눌림 {md(D[k])})").translate(FIX), fontsize=17, weight="bold", loc="left")
 st = max(10, int(np.ceil(XR / 18 / 10)) * 10 if FUT else len(X) // 140 * 10)
-tk = [i for i in X if i <= bs and (i - w0) % st == 0] + [i for i in X if i > bs and ((i - bs) % max(1, round(st / SC)) == 0 or i == n)]; vx.set_xticks([ix(i) for i in tk]); vx.set_xticklabels([md(D[i]) for i in tk], fontsize=9)
+tk = [i for i in X if i <= bs and (i - w0) % st == 0] + [i for i in X if i > bs and ((i - bs) % max(1, round(st / SC)) == 0 or i == n)]; tk = [i for j, i in enumerate(tk) if j == len(tk) - 1 or ix(tk[j + 1]) - ix(i) > XR / 22]   # 붙은 날짜 글자 겹침 방지(마지막 봉 우선)
+vx.set_xticks([ix(i) for i in tk]); vx.set_xticklabels([md(D[i]) for i in tk], fontsize=9)
 plt.setp(ax.get_xticklabels(), visible=False); vx.set_ylabel("거래량"); vx.grid(alpha=0.25)
 vx.text(ix(b), v[b], f" {F['breakout']['vol_x']}배", fontsize=9, color="#d62728", va="bottom", weight="bold")
 

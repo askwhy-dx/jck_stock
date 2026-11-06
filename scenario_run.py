@@ -63,6 +63,7 @@ def draw_rr(code, m, bars, names, out):
     ax.set_title(f"{m['name']}({code}) — 손익비 시나리오 (신호 {md(D[sg])})", fontsize=17, weight="bold", loc="left")
     st = max(10, int(np.ceil(XR / 18 / 10)) * 10)
     tk = [i for i in X if i <= bs and (i - w0) % st == 0] + [i for i in X if i > bs and ((i - bs) % max(1, round(st / SC)) == 0 or i == n)]
+    tk = [i for j, i in enumerate(tk) if j == len(tk) - 1 or ix(tk[j + 1]) - ix(i) > XR / 22]   # 붙은 날짜 글자 겹침 방지(마지막 봉 우선)
     vx.set_xticks([ix(i) for i in tk]); vx.set_xticklabels([md(D[i]) for i in tk], fontsize=9)
     plt.setp(ax.get_xticklabels(), visible=False); vx.set_ylabel("거래량"); vx.grid(alpha=0.25)
     sd = fig.add_axes([0.70, 0.08, 0.29, 0.84]); sd.axis("off")
@@ -83,8 +84,8 @@ def draw_rr(code, m, bars, names, out):
 
 
 def drive():
-    from dotenv import load_dotenv, find_dotenv
-    load_dotenv(find_dotenv(usecwd=True))
+    from dotenv import load_dotenv
+    load_dotenv(ROOT.parent / ".env")   # 구글 인증 키는 워크스페이스(test) .env — jck_stock/.env 에는 없다
     p = os.path.join(os.environ["GOOGLE_AUTH_DIR"], "gdrive_shared.py")            # 회사 계정 = 폴더 소유자
     s = importlib.util.spec_from_file_location("gdrive_shared_company", p); g = importlib.util.module_from_spec(s); s.loader.exec_module(g)
     return g.drive_service()
