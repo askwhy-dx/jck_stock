@@ -175,35 +175,44 @@ function gateRows(analysis) {
   let st = { managed: {} };
   try { st = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'auto_intake_state.json'), 'utf-8')); } catch (e) { log(`⚠️ auto_intake_state 로드 실패: ${e.message}`); }
   const swing = Object.entries(st.managed || {}).sort((a, b) => (b[1].rr?.ev_pct ?? -99) - (a[1].rr?.ev_pct ?? -99))
-    .map(([code, m]) => [m.name, cell(code)]).filter(r => r[1]);
+    .map(([code, m]) => [m.name, cell(code), scenLink(code)]).filter(r => r[1]);
   // 밥그릇3 = 대시보드 탭과 같은 5종(build_bowl3_tab.js 가 쓰는 bowl3_watch.json) — 2026-10-23 수정:
   //   종전 bowl3_quality 점수 순 5종은 손절 퇴출·재진입 금지 종목이 섞이고 탭 종목이 빠졌다
   let bowl3 = [];
   try {
     bowl3 = (JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'bowl3_watch.json'), 'utf-8')).stocks || [])
-      .map(r => [r.name, cell(r.code)]).filter(r => r[1]);
+      .map(r => [r.name, cell(r.code), scenLink(r.code)]).filter(r => r[1]);
   } catch (e) { log(`⚠️ bowl3_watch 로드 실패: ${e.message}`); }
   return { swing, bowl3 };
 }
-const GATE_HEAD = ['종목', '충족'];
+// 시나리오 링크 (scenario_run.py [1s] 가 Drive 에 올린 그림 · data/scenario_state.json · 없으면 '-')
+let _scen = null;
+const scenLink = code => {
+  if (!_scen) { try { _scen = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'scenario_state.json'), 'utf-8')); } catch { _scen = {}; } }
+  return _scen[code]?.link ? { url: _scen[code].link, text: '시나리오' } : '-';
+};
+const GATE_HEAD = ['종목', '충족', '시나리오'];
 // Block Kit table 블록 (메시지당 1개만 허용 → 스윙·밥그릇3 은 메시지를 나눈다)
 const tableBlock = (rows, head = GATE_HEAD) => ({
   type: 'table',
   column_settings: head.map(h => ({ align: h === '종목' || h === '테마' || h === '재무' ? 'left' : 'center' })),
-  rows: [head, ...rows].map(r => r.map(text => ({ type: 'raw_text', text: String(text) }))),
+  rows: [head, ...rows].map(r => r.map(t => t && t.url
+    ? { type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'link', url: t.url, text: t.text }] }] }
+    : { type: 'raw_text', text: String(t) })),
 });
 // table 블록이 거부될 때의 대체 — 고정폭 코드 블록 (한글·이모지는 2칸으로 맞춤)
 const dispW = t => [...t].reduce((w, ch) => w + (/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\u{1F300}-\u{1FAFF}]/u.test(ch) ? 2 : 1), 0);
 const pad = (t, w) => t + ' '.repeat(Math.max(0, w - dispW(t)));
 function textTable(rows, head = GATE_HEAD) {
-  const all = [head, ...rows].map(r => r.map(String));
+  const all = [head, ...rows].map(r => r.map(t => t && t.url ? t.text : String(t)));
   const ws = head.map((_, c) => Math.max(...all.map(r => dispW(r[c]))));
   return '```\n' + all.map(r => r.map((t, c) => pad(t, ws[c])).join('  ')).join('\n') + '\n```';
 }
 function gateSection(title, rows, asTable, cols = GATE_HEAD) {
   const head = { type: 'section', text: { type: 'mrkdwn', text: `*${title}*` } };
   if (!rows.length) return [head, { type: 'section', text: { type: 'mrkdwn', text: '없음' } }];
-  return asTable ? [head, tableBlock(rows, cols)] : [head, { type: 'section', text: { type: 'mrkdwn', text: textTable(rows, cols) } }];
+  const links = rows.filter(r => r.some(t => t && t.url)).map(r => `<${r.find(t => t && t.url).url}|${r.find(t => typeof t === 'string')}>`);
+  return asTable ? [head, tableBlock(rows, cols)] : [head, { type: 'section', text: { type: 'mrkdwn', text: textTable(rows, cols) + (links.length ? `\n시나리오: ${links.join(' · ')}` : '') } }];
 }
 
 // 충족 개수 내림차순 묶음 · 묶음 안은 대시보드 순서 유지
@@ -325,7 +334,7 @@ function buildBlocks(analysis) {
   blocks.push({ type: 'divider' });
   blocks.push({
     type: 'section',
-    text: { type: 'mrkdwn', text: `*🍚 밥그릇3 매수*\n${b3.length ? b3.map(([name, v]) => `• *${name}*  ${v}`).join('\n') : '없음'}` },
+    text: { type: 'mrkdwn', text: `*🍚 밥그릇3 매수*\n${b3.length ? b3.map(([name, v, sl]) => `• *${name}*  ${v}${sl.url ? `  <${sl.url}|시나리오>` : ''}`).join('\n') : '없음'}` },
   });
 
   // 대시보드 링크 버튼
@@ -376,21 +385,21 @@ const exposureLine = ([title, items]) =>
   `*${title}* ${items == null ? '— (데이터 없음)' : items.length ? items.join(' · ') : '없음'}`;
 
 // 08:30 노출 카드 — 🎯 손익비는 표(2026-10-19 사용자 지시), 나머지 줄은 그대로
-const RR_HEAD = ['순위', '종목', '테마', '승률', '재무'];
+const RR_HEAD = ['순위', '종목', '테마', '승률', '재무', '시나리오'];
 function rrRows(analysis) {
   const rr = loadDataJson('rr_breakout', analysis.date);
   if (!rr) return null;
   return rr.picks.map((p, i) => [i + 1, p.name, (p.themes || [])[0] || '-', `${Math.round(p.win * 100)}%`,
-    p.fin_ok === true ? '✅ 3년 성장' : p.fin_ok === false ? `❌ ${p.fin}` : (p.fin || '-')]);
+    p.fin_ok === true ? '✅ 3년 성장' : p.fin_ok === false ? `❌ ${p.fin}` : (p.fin || '-'), scenLink(p.code)]);
 }
 // 08:30 🍚 밥그릇3 표 — 점수 순 5종 (대시보드 탭과 같은 순서) · 두 번째 메시지 (table 블록은 메시지당 1개)
-const B3_HEAD = ['순위', '종목', '테마', '점수'];
+const B3_HEAD = ['순위', '종목', '테마', '점수', '시나리오'];
 function bowl3Rows(analysis) {
   const b3 = loadDataJson('bowl3_quality', analysis.date);
   if (!b3) return null;
   stockTag('000000'); // 테마 사전 로드
   return (b3.passed || []).slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 5)
-    .map((r, i) => [i + 1, r.name, _tags.theme[r.code] || '-', r.score ?? '-']);
+    .map((r, i) => [i + 1, r.name, _tags.theme[r.code] || '-', r.score ?? '-', scenLink(r.code)]);
 }
 function buildRecommendBowl3Blocks(analysis) {
   const rows = bowl3Rows(analysis);

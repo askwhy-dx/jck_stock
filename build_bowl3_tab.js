@@ -12,7 +12,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { scenario, krxBars, lastClose, fmt, gateScores, gateCell, marketOf } = require('./auto_intake.js');
+const { scenario, krxBars, lastClose, fmt, gateScores, gateCell, marketOf, scenLinks, scenCell } = require('./auto_intake.js');
 
 const ROOT = __dirname;
 const HTML = path.join(ROOT, '분석_대시보드.html');
@@ -99,17 +99,17 @@ function main() {
 
   const th = themeOf();
   const td = (l, v) => `<td data-label="${l}">${v}</td>`;
-  const gs = gateScores();
+  const gs = gateScores(); const sl = scenLinks();
   const rows = top.map(({ r, m, close }, i) => {
     const sw = 1 - m.stop / m.p1;
-    return `      <tr>${td('순위', i + 1)}${td('충족', gateCell(gs[r.code]))}${td('종목', `<strong>${r.name}</strong> <span class="hd-note">${marketOf(r.code)}</span>`)}${td('테마', (th[r.code] || []).slice(0, 2).join('<br>') || '-')}${td('경과', `D+${m.dplus ?? 0}`)}${td('점수', r.score ?? '-')}${td('현재가', close ? fmt(close) : '-')}${td('1차', fmt(m.p1))}${td('2차', fmt(m.p2))}${td('3차', fmt(m.p3))}${td('손절', fmt(m.stop))}${td('목표', fmt(m.target))}${td('손절 폭', `−${(sw * 100).toFixed(1)}%`)}${td('손익비', m.rr1.toFixed(2))}${td('재무·공시', `${r.fin_ok ? '✅ 3년 성장' : `➖ ${r.fin || '-'}`}<br>✅ 공시 청정`)}</tr>`;
+    return `      <tr>${td('순위', i + 1)}${td('충족', gateCell(gs[r.code]))}${td('종목', `<strong>${r.name}</strong> <span class="hd-note">${marketOf(r.code)}</span>`)}${td('테마', (th[r.code] || []).slice(0, 2).join('<br>') || '-')}${td('경과', `D+${m.dplus ?? 0}`)}${td('점수', r.score ?? '-')}${td('현재가', close ? fmt(close) : '-')}${td('1차', fmt(m.p1))}${td('2차', fmt(m.p2))}${td('3차', fmt(m.p3))}${td('손절', fmt(m.stop))}${td('목표', fmt(m.target))}${td('손절 폭', `−${(sw * 100).toFixed(1)}%`)}${td('손익비', m.rr1.toFixed(2))}${td('재무·공시', `${r.fin_ok ? '✅ 3년 성장' : `➖ ${r.fin || '-'}`}<br>✅ 공시 청정`)}${td('시나리오', scenCell(sl, r.code))}</tr>`;
   });
   const sec = `<section id="bowl3-tab-summary">
   <h3 style="margin:8px 0;">🍚 밥그릇3 <span class="hd-note">(${b3.anchor || ''} KRX 확정봉 · 점수 순 최대 ${TOPN}종 · 08:30 갱신 · 손절 = 돌파선(max MA112·224) −1% 종가 = 🎯 손익비와 동일)</span></h3>
   <table class="stock-table" style="font-size:0.88em;">
-    <thead><tr><th>순위</th><th>충족</th><th>종목</th><th>테마</th><th>경과</th><th>점수</th><th>현재가</th><th>1차</th><th>2차</th><th>3차</th><th>손절</th><th>목표</th><th>손절 폭</th><th>손익비</th><th>재무·공시</th></tr></thead>
+    <thead><tr><th>순위</th><th>충족</th><th>종목</th><th>테마</th><th>경과</th><th>점수</th><th>현재가</th><th>1차</th><th>2차</th><th>3차</th><th>손절</th><th>목표</th><th>손절 폭</th><th>손익비</th><th>재무·공시</th><th>시나리오</th></tr></thead>
     <tbody>
-${rows.join('\n') || '      <tr><td colspan="15">없음</td></tr>'}
+${rows.join('\n') || '      <tr><td colspan="16">없음</td></tr>'}
     </tbody>
   </table>
   <p class="hd-note">밥그릇3 = 3구간 눌림 — 1구간(−40% 하락) · 2구간(하락 기간 0.5배 이상 박스) 뒤 장기선(112·224) 동시 돌파 후 20거래일 안 장기선까지 첫 눌림 + 양봉 + 외국인·기관 5일 순매수 + 올해 악재 공시 0건 (재무 3년 성장은 표시만) · 점수 = 외국인+기관 5일 순매수 ÷ 20일 평균 거래량(%) · 눌림일부터 60거래일 노출 · 충족 = 최신 16:30·19:00 분석 기준 매수 판정(가격 + 거래량·외국인·프로그램 3개 중 3개 🟢 매수 · 2개 🟡 매수가능 · 그 외 ⚪ 대기, 양봉은 참고) + 조건별 판정(🟢 충족 · 🔴 미충족 · ⚪ 판정 불가) · 경과 D+N = 탭에 들어온 뒤 거래일 · 1차·2차·3차·손절·목표는 들어온 날 §4.4 기계 산식으로 고정 · 매 회차(08:30·16:30·19:00) 최신 종가 &lt; 손절 또는 &gt; 목표면 삭제(Slack 알림) 후 ${BAN_DAYS}거래일 재진입 금지 · 표시 전용(스윙 탭 자동 편입 아님)</p>

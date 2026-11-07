@@ -45,6 +45,7 @@
 | `auto_intake.js` · `exposure.js` | 08:30 [B3] — **🎯 손익비 섹션만**(2026-10-19~, 눌림·돌파·밥그릇3·테마는 Slack 표시 전용) §6 라인업·stocks.json·스윙 카드에 **자동 편입**, 라인업 **최대 5종**(빈자리만). 퇴출에 ④ 종가 < 손절 추가 — **2026-10-26부터 매 회차**(08:30 + 16:30·19:00 full 맨 앞 [0s] `--summary-only`) `lastClose` = KRX 캐시, 오늘 봉이 없고 15:31 이후면 네이버 15:30 분봉(KRX 공식 종가 · 네이버 일봉·closePrice 는 시간외·NXT 로 계속 바뀌어 쓰면 안 됨). **목표 이탈(종가 > 목표)도 26-10-28부터 매 회차 같은 `lastClose` 로 퇴출**(종전 08:30 T3-U 만). 손절·목표 이탈 퇴출은 Slack 「🛑 손절·목표 이탈」 별도 알림. 카드 제목 끝 **D+N**(편입 후 경과 거래일, 매 08:30 갱신 · `auto_intake_state.json` `dplus`) — 19:00 Slack 종목명 뒤에도 표시. 활성 카드가 0장일 때는 HTML 주석 `🎯 스윙 활성 카드 삽입 위치`(지우지 말 것) 뒤에 넣는다. 종전 설명: 📋 노출 종목을 §6 라인업·stocks.json·스윙 카드에 **자동 편입**(시나리오 §4.3/§4.4 기계 근사 · 라벨 「미체결 🤖자동」) + 자동 퇴출(MA20·60 동시 하회 / 20거래일 미체결 / 목표 초과). 🤖자동 라벨을 체결 등으로 바꾸면 자동 관리에서 빠진다. 재구축·수동 지정은 `node auto_intake.js --rebuild=코드,코드`(라인업에 없는 종목은 「✋ 수동 지정」으로 새로 편입 · 추세 이탈 등으로 건너뛰면 기존 항목 유지) · 점검 `--dry-run` · 테스트 `node test_auto_intake.js`. `exposure.js` = 노출 목록(Slack과 공용) |
 | `check_krx_ready.py` | 아침 회차 [B-1] — 직전 영업일 KRX 공개 확인(exit 1 = 미공개 → 08:30 재시도) |
 | `slack_send.js` | Slack. 아침 회차 = 「📋 노출 종목」 1장 — **🎯 손익비는 table 블록(순위·종목·테마·승률·재무, 2026-10-19)**, 나머지(밥그릇3·임원매수)는 종목명·점수 줄(SOP §5.4). 08:30 회차 = 노출 카드(🎯 손익비 표) + 두 번째 메시지 **🍚 밥그릇3 표**(순위·종목·테마·점수). 16:30·19:00 회차 = **1장**: 🎯 손익비 매수(Block Kit `table` 블록: 종목·충족, 대시보드 요약표 순서) + **🍚 밥그릇3 매수**(같은 메시지 안 줄 목록 — table 은 메시지당 1개 · 대상 = 대시보드 탭과 같은 `bowl3_watch.json` 5종) · **🚨 위험 종목 섹션 삭제**(10-23 사용자 지시, 그 자리에 밥그릇3) — **매수 대상만 표시**(10-23: `auto_intake.buyVerdict` — 가격 pass + 거래량·외국인·프로그램 3개 중 🟢 3개 매수 · 🟡 2개 매수가능, ⚪ 대기는 뺀다 · **양봉은 판정 제외, 양봉/음봉 참고 표시** · 5/5 `all_required_met` 판정 자체는 그대로) · table 블록이 거부되면 코드 블록 표로 자동 재발송(2026-10-19). 종전: ✅ 활성은 **진입조건 충족 개수별 묶음**(묶음 제목 = header 블록 큰 글씨 + 🟢전부/🟡절반 이상/🔴절반 미만 · 종목마다 `*종목명*  코스피 · 테마` + `❌ 미충족 항목`(fail·unknown) 2줄) + 🌟 추천 + 🚨 위험 종목(존치). 테마 = `data/naver_theme_map.json` 중 구성종목 최소 1개. 규칙 SSOT = `AI단테.md` §4.6.16 |
+| `scenario_run.py` · `scenario_lib.py` | 16:30·19:00 full [1s] (26-11-07) — 🎯손익비(auto_intake 관리)·🍚밥그릇3(bowl3_state) 시나리오 그림. 시나리오는 **편입일 KRX 종가로 1회 고정**(`data/scenario_state.json`), 이후 회차는 그 회차 토스 봉(`data/api_chart`)까지 그려 진행 판정만 — 체결(§6 실제 체결 우선, 없으면 저가 ≤ 1차)·손절·목표·기한으로 A/B/C 소멸은 흐리게, 가까운 경로는 굵게. 밥그릇3 그림 = `bowl3_chart.py --live`. PNG `data/scenario_png/` → Google Drive 「대시보드 시나리오」(회사 계정 = `test/.env` `GOOGLE_AUTH_DIR`, **권한 소유자만 — 사용자 확정, 바꾸지 말 것**) 종목당 1파일 덮어쓰기(링크 고정) → 손익비·밥그릇3 표 재무·공시 뒤 「시나리오」 열 + Slack 시나리오 링크. 실패해도 회차를 막지 않음(exit 0) · 퇴출 종목은 상태에서 지움 · 약 1분 |
 | `verify_sync.js` | 발행 전 라인업 SSOT 게이트 |
 | `upload_dashboard.js` | GitHub 업로드 (HTML + MD 3종) |
 | `config/holiday_kr.json` | KRX 휴장일 |
@@ -78,7 +79,7 @@
 | 테마 탭 데이터만 재계산 | `PY -u collect_theme_rotation.py` (`--dry-run` 은 저장 안 함) | 셸에서 직접 돌리면 `PYTHONIOENCODING=utf-8` 필수(없으면 cp949 로 로그 이모지에서 죽고 **저장 안 됨**) |
 | 테마 탭만 대시보드에 반영 | `node -e "const fs=require('fs'),{renderThemeSection}=require('./claude_dante_analyze.js');const tr=JSON.parse(fs.readFileSync('data/theme_rotation_YYYY-MM-DD.json','utf-8'));const f='분석_대시보드.html';fs.writeFileSync(f,fs.readFileSync(f,'utf-8').replace(/<section id=\"theme-cards\"[\s\S]*?<\/section>/,()=>renderThemeSection(tr).trim()),'utf-8')"` → 발행은 `node upload_dashboard.js` | `patchFlowSections` 는 눌림·돌파·요약 탭까지 다시 그리므로 쓰지 말고 테마 섹션만 교체 |
 | 월간 회고 수동 | `cmd /c run_weekly_reflect.bat` | Slack 발송됨 |
-| 밥그릇3 종목 그림 설명 | 스킬 `bowl3-chart` (`.claude/skills/bowl3-chart/scripts/bowl3_chart.py <코드\|종목명> --out png [--notes json]`) | KRX 캐시만 사용(토스 호출 없음) · 대시보드 게시 안 함 · 밥그릇3 아니면 「신호 없음」 |
+| 밥그릇3 종목 그림 설명 | 스킬 `bowl3-chart` (`.claude/skills/bowl3-chart/scripts/bowl3_chart.py <코드\|종목명> --out png [--notes json]`) | KRX 캐시만 사용(토스 호출 없음, `--live` 는 저장된 토스 일봉 txt 만 붙임) · 그림 자체는 대시보드에 올리지 않음(스케줄 [1s] 가 Drive 링크만 붙임) · 밥그릇3 아니면 「신호 없음」 |
 | 스케줄러 재등록·삭제 | 관리자 권한 `schtasks /create /xml ... /f` (원본 XML: `test/archive/20260914_scheduler_retime/`) | |
 
 recommend 순서: B-1 KRX 공개 확인 → B0 디커플링 → B1 눌림 → B1b 돌파 → B1c forward 평가 → **B1g 손익비 → B1d 밥그릇3**(10-21 순서 변경 · B1h ⚡단타는 10-28 삭제) → **B1e 테마** → **B1f 임원매수**(`screen_insider_buys.py` → `data/insider_buys_{날짜}.json`, Slack 노출 종목 맨 아래 「👔 임원매수 코스피/코스닥」 최대 5종 = 종목명(테마). 조건 = 직전 30일 간부진 장내매수 + 5일선 112/224 상향돌파(**7거래일 내**, 10-16 60→7) 후 고점 대비 −5% 이상 눌림·장기선 −3~+5% + 3개년 당기순이익 흑자(B안). 테스트 `test_insider_buys.py`. **표시 전용 — exposure.js·자동 편입에 넣지 말 것**) → B2 분석·패치 → **B3 노출 자동 편입(🎯 손익비만)** → 2c verify → 업로드 → Slack.
@@ -94,6 +95,7 @@ recommend 순서: B-1 KRX 공개 확인 → B0 디커플링 → B1 눌림 → B1
 - Python 은 bat 의 `%PY%`(Python312 고정) 사용. bare `python` 은 Hermes venv 로 가로채져 스캐너가 0종으로 조용히 죽은 이력.
 - KRX 캐시의 휴장일 파일은 `rows` 0개 — 거래일 판정은 파일 존재가 아니라 행수로.
 - 대시보드는 공개다. 회사·개인 데이터 넣지 말 것.
+- **Slack = `SLACK_WEBHOOK_URL` 하나, 발송 대상 `D0B4Q2PTARY`.** 이 웹훅 URL 은 **「#단테 자동화 알림」 전용** — 다른 프로젝트·채널 알림에 쓰지 말고, 이 폴더 알림을 다른 URL·봇으로 보내지 말 것. ⚠️ `test/.env` 에 같은 키를 **두 번 쓰면 Node dotenv 는 뒤 줄을 쓴다** — 26-11-06 교육용 웹훅을 같은 이름으로 추가해 단테 알림이 #test-v1 로 샘(11-07 `SLACK_WEBHOOK_URL_EDU` 로 개명). 새 웹훅은 다른 키 이름으로.
 
 ## 변경 이력
 

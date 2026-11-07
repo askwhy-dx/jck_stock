@@ -3,6 +3,20 @@
 완료된 수정 내역 보관용. 현재 상태·규칙은 `../CLAUDE.md`, 파이프라인 상세는 `AUTOMATION_README.md`, 매매·종목 이력은 `../AI단테.md` §6 · `../AI단테_아카이브.md` · `../AI단테_매매일지.md`.
 새 항목은 맨 위에 추가한다.
 
+## 2026-11-07 — 시나리오 그림 스케줄 연결 + 대시보드·Slack 「시나리오」 열
+- `run_daily_dante.bat` 16:30·19:00 full 에 [1s] `scenario_run.py` 추가([1] 토스 스냅샷 뒤 · non-fatal · `--dry-run` 이면 `--no-upload`). 링크는 [2e] 요약표 재작성·[5] Slack 이 `data/scenario_state.json` 에서 읽는다.
+- 대시보드: 🎯 손익비 요약표(`auto_intake.js` `scenCell`)·🍚 밥그릇3 표(`build_bowl3_tab.js`) 재무·공시 뒤 「시나리오」 열(Drive 링크, 없으면 -).
+- Slack(`slack_send.js` `scenLink`): 16:30·19:00 손익비 표 3열(rich_text 링크) · 밥그릇3 줄 끝 `시나리오` 링크 · 08:30 손익비·밥그릇3 표 끝 열. 코드 블록 대체 표면 아래 줄에 링크 목록.
+- 속도: 밥그릇3 그림을 subprocess → 같은 프로세스(runpy + KRX 캐시 1회) — 8종 약 5분 → 약 1분.
+- 퇴출된 종목은 `scenario_state.json` 에서 지움 → 다시 들어오면 새 시나리오.
+- Drive 폴더 권한은 소유자만(사용자 확정 — 본인만 봄). 백업 `backup/*.bak_scen_20261107`·`scenario_run.py.bak_batch_20261107`.
+
+## 2026-11-06 — 시나리오 그림 샘플 (스케줄 미연결)
+- 신규 `scenario_lib.py`(시나리오 고정·진행 판정·미래 구간 그리기) · `scenario_run.py`(🎯손익비 auto_intake 관리 + 🍚밥그릇3 → `data/scenario_png/` → Drive 「대시보드 시나리오」 폴더 종목당 1파일 덮어쓰기, 링크 = `data/scenario_state.json` link).
+- 시나리오는 편입일 KRX 종가로 1회 고정, 이후 회차는 토스 오늘 봉(`data/api_chart`)까지 그려 판정: 체결 = §6 실제 체결 우선, 없으면 저가 ≤ 1차 → B 소멸 / 체결 뒤 종가 < 손절 = C 확정 / 고가 ≥ 목표 = A 확정 / 미체결 종가 > 목표·기한(손익비 20·밥그릇3 눌림+60)·추세 이탈(손익비) = 퇴출. 소멸 경로 흐림, 가까운 경로 굵게.
+- `bowl3_chart.py --live` 추가(토스 오늘 봉 + 고정 시나리오 저장), x축 = 기준일 뒤 구간 확대. 백업 `backup/bowl3_chart.py.bak_live_20261106`.
+- 미연결: bat [1s] 단계 · 대시보드/Slack 「시나리오」 열. 8종 실행 약 5분(밥그릇3 종목마다 KRX 캐시 재로드).
+
 ## 2026-11-06 — 하이록코리아 1차 체결 등록
 
 - 사용자 체결 알림: 하이록코리아(013030) 3주 @30,850 (KB 알림 오후 5:17 → 11-05 NXT 애프터마켓으로 기록 · 11-06 13시 반영). 미원상사 11-03 1주는 이미 반영돼 있어 변경 없음.

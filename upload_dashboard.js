@@ -167,7 +167,7 @@ function scanImages() {
 }
 
 (async () => {
-  const commitMsg = `2026-11-06 하이록코리아 1차 체결 3주 @30,850 매입 등록`;
+  const commitMsg = `2026-11-07 손익비·밥그릇3 표에 시나리오 링크 열 추가`;
 
   console.log(`=== [1/4] financial/ 경로 업로드 (HTML + MD 3-tier) ===`);
   const results = [];

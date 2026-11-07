@@ -185,6 +185,13 @@ if not "%SNAPSHOT_RC%"=="0" (
     goto :summary
 )
 
+REM [1s] 2026-11-07: scenario charts (rr + bowl3) drawn at this run's Toss bar -> Google Drive folder,
+REM      links kept in data/scenario_state.json for the dashboard tables and Slack. Non-fatal (always exit 0).
+echo [1s] Scenario charts (scenario_run.py)
+set "SCEN_FLAG="
+if "%DRY_FLAG%"=="--dry-run" set "SCEN_FLAG=--no-upload"
+%PY% -X utf8 scenario_run.py %SCEN_FLAG% 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+
 REM [1b] Refresh similar-pattern recall (current lineup vs closed-trade pool; non-fatal)
 echo [1b] Similar-pattern recall (recall_similar.js)
 node recall_similar.js 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"

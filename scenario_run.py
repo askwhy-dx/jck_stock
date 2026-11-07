@@ -6,7 +6,7 @@ Google Drive 폴더에 종목당 파일 1개로 덮어쓰고, 링크를 data/sce
   · 시나리오는 처음 잡힌 날(편입일 KRX 종가) 고정 · 이후 회차는 진행 판정만(scenario_lib)
   · 실패해도 종료코드 0 (회차를 막지 않음) — 실패 종목은 link 를 비워 둔다
 """
-import argparse, json, os, subprocess, sys, importlib.util, traceback
+import argparse, contextlib, io, json, os, runpy, sys, importlib.util, traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import screen_rr_breakout
 from screen_rr_breakout import load, ma
 import scenario_lib as SL
 
@@ -109,10 +110,15 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--no-upload", action="store_true"); ap.add_argument("--only")
     A = ap.parse_args(); only = set(A.only.split(",")) if A.only else None
     OUT.mkdir(parents=True, exist_ok=True)
-    bars, names, _ = load()
+    cached = load(); bars, names, _ = cached
+    screen_rr_breakout.load = lambda: cached   # bowl3_chart.py 가 import 하는 load 를 캐시로
     rr = {c: m for c, m in json.load(open(ROOT / "data" / "auto_intake_state.json", encoding="utf-8"))["managed"].items() if m.get("section") == "rr"}
     b3 = json.load(open(ROOT / "data" / "bowl3_state.json", encoding="utf-8"))["managed"]
     jobs = [("rr", c, m) for c, m in rr.items()] + [("bowl3", c, m) for c, m in b3.items()]
+    st = SL.load_state(); live = {c for _, c, _ in jobs}
+    if not only and set(st) - live:   # 퇴출된 종목은 지움 → 다시 들어오면 그날 기준으로 새 시나리오 (Drive 옛 파일은 남음)
+        SL.save_state({c: v for c, v in st.items() if c in live})
+    # ponytail: 상태 키 = 종목코드 하나 — 같은 종목이 손익비·밥그릇3 에 동시에 있으면 한 그림만 남는다(현재 겹침 없음), 생기면 키를 kind:code 로
     dv = None if A.no_upload else drive()
     for kind, code, m in jobs:
         if only and code not in only:
@@ -122,10 +128,15 @@ def main():
             if kind == "rr":
                 draw_rr(code, m, bars, names, out)
             else:
-                r = subprocess.run([sys.executable, "-X", "utf8", str(ROOT / ".claude/skills/bowl3-chart/scripts/bowl3_chart.py"), code, "--live", "--out", str(out)],
-                                   capture_output=True, text=True, encoding="utf-8")
-                if r.returncode:
-                    raise RuntimeError(r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.stdout[-200:])
+                sys.argv = ["bowl3_chart.py", code, "--live", "--out", str(out)]   # 같은 프로세스 — KRX 캐시 1회만 읽음
+                try:
+                    with contextlib.redirect_stdout(io.StringIO()):   # 스킬 스크립트의 JSON 출력은 로그에 안 남김
+                        runpy.run_path(str(ROOT / ".claude/skills/bowl3-chart/scripts/bowl3_chart.py"), run_name="__main__")
+                except SystemExit as e:
+                    if e.code:
+                        raise RuntimeError(str(e.code))
+                finally:
+                    plt.close("all")
             st = SL.load_state(); sc = st[code]
             if dv:
                 sc["drive_id"] = upload(dv, out, sc); sc["link"] = f"https://drive.google.com/file/d/{sc['drive_id']}/view"

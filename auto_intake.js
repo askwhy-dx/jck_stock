@@ -314,21 +314,24 @@ const rrStats = r => ({ signal_date: r.signal_date, themes: r.themes, n: r.n, wi
 const finCell = r => !r ? '-' : r.disclosure && r.disclosure.startsWith('악재') ? `⚠️ ${r.disclosure}` : r.fin_ok === true ? '✅ 3년 성장' : r.fin_ok === false ? `❌ ${r.fin}` : (r.fin || '-');
 
 // 스윙 탭 맨 위 🎯 손익비 요약표 (2026-10-19 · 스윙/중장기 탭 개편) — 매 회차 state 로 다시 그린다
+// 시나리오 칸 — scenario_run.py([1s] 16:30·19:00)가 Drive 에 올린 그림 링크 (data/scenario_state.json · 없으면 -)
+const scenLinks = () => { try { return JSON.parse(fs.readFileSync(path.join(DATA, 'scenario_state.json'), 'utf-8')); } catch { return {}; } };
+const scenCell = (sl, code) => sl[code]?.link ? `<a href="${sl[code].link}" target="_blank" rel="noopener">시나리오</a>` : '-';
 const SUMMARY_RE = /<section id="rr-swing-summary"[^>]*>[\s\S]*?<\/section>\n?/;
 function renderSwingSummary(state) {
   const rows = Object.entries(state.managed).filter(([, m]) => m.p1)
     .sort((a, b) => (b[1].rr?.ev_pct ?? -99) - (a[1].rr?.ev_pct ?? -99));
   const td = (l, v) => `<td data-label="${l}">${v}</td>`;
-  const gs = gateScores();
-  const body = rows.map(([code, m], i) => `      <tr>${td('순위', i + 1)}${td('충족', gateCell(gs[code]))}${td('종목', `<strong>${m.name}</strong> <span class="hd-note">${marketOf(code)}</span>`)}${td('테마', (m.rr?.themes || []).slice(0, 3).join('<br>') || '-')}${td('경과', `D+${m.dplus ?? 0}`)}${td('신호일', m.rr ? `${m.rr.signal_date.slice(4, 6)}-${m.rr.signal_date.slice(6)}` : '-')}${td('1차', fmt(m.p1))}${td('2차', m.p2 ? fmt(m.p2) : '-')}${td('3차', m.p3 ? fmt(m.p3) : '-')}${td('손절', fmt(m.stop))}${td('목표', fmt(m.target))}${td('손절 폭', `−${((1 - m.stop / m.p1) * 100).toFixed(1)}%`)}${td('손익비', m.rr1 ?? '-')}${td('승률', m.rr ? `${Math.round(m.rr.win * 100)}%` : '-')}${td('재무·공시', finCell(m.rr))}</tr>`).join('\n');
+  const gs = gateScores(); const sl = scenLinks();
+  const body = rows.map(([code, m], i) => `      <tr>${td('순위', i + 1)}${td('충족', gateCell(gs[code]))}${td('종목', `<strong>${m.name}</strong> <span class="hd-note">${marketOf(code)}</span>`)}${td('테마', (m.rr?.themes || []).slice(0, 3).join('<br>') || '-')}${td('경과', `D+${m.dplus ?? 0}`)}${td('신호일', m.rr ? `${m.rr.signal_date.slice(4, 6)}-${m.rr.signal_date.slice(6)}` : '-')}${td('1차', fmt(m.p1))}${td('2차', m.p2 ? fmt(m.p2) : '-')}${td('3차', m.p3 ? fmt(m.p3) : '-')}${td('손절', fmt(m.stop))}${td('목표', fmt(m.target))}${td('손절 폭', `−${((1 - m.stop / m.p1) * 100).toFixed(1)}%`)}${td('손익비', m.rr1 ?? '-')}${td('승률', m.rr ? `${Math.round(m.rr.win * 100)}%` : '-')}${td('재무·공시', finCell(m.rr))}${td('시나리오', scenCell(sl, code))}</tr>`).join('\n');
   // 🤖자동 관리 종목 카드만 숨김(2026-10-19 사용자 지시 · 26-11-03 체결 보유 카드는 표시) — 19:00 분석이 카드의 진입 조건을 SSOT 로 읽으므로 DOM 에는 남긴다
   return `<section id="rr-swing-summary" data-auto="${rows.map(([c]) => c).join(",")}">
   <style>${[...rows.map(([c]) => `#card-${c}-active`), "#stock-filter-panel"].join(",")}{display:none!important}</style>
   <h3 style="margin:8px 0;">🎯 손익비 돌파 <span class="hd-note">(최대 5종 · 08:30 KRX 확정봉 · 손절 = 돌파선 −1% 종가 · 손절 폭 2~5% · 매 회차 종가 &lt; 손절이면 삭제)</span></h3>
   <table class="stock-table" style="font-size:0.88em;">
-    <thead><tr><th>순위</th><th>충족</th><th>종목</th><th>테마</th><th>경과</th><th>신호일</th><th>1차</th><th>2차</th><th>3차</th><th>손절</th><th>목표</th><th>손절 폭</th><th>손익비</th><th>승률</th><th>재무·공시</th></tr></thead>
+    <thead><tr><th>순위</th><th>충족</th><th>종목</th><th>테마</th><th>경과</th><th>신호일</th><th>1차</th><th>2차</th><th>3차</th><th>손절</th><th>목표</th><th>손절 폭</th><th>손익비</th><th>승률</th><th>재무·공시</th><th>시나리오</th></tr></thead>
     <tbody>
-${body || '      <tr><td colspan="16">없음</td></tr>'}
+${body || '      <tr><td colspan="17">없음</td></tr>'}
     </tbody>
   </table>
   <p class="hd-note">충족 = 최신 16:30·19:00 분석 기준 매수 판정(가격 + 거래량·외국인·프로그램 3개 중 3개 🟢 매수 · 2개 🟡 매수가능 · 그 외 ⚪ 대기, 양봉은 참고) + 조건별 판정(🟢 충족 · 🔴 미충족 · ⚪ 판정 불가) · 경과 D+N = 편입 후 거래일 · 승률 = 신호 봉이 비슷한 과거 사례 중 60일 안 +10% 선도달 비율 · 1차·2차·3차(1:1:2)·손절·목표는 §4.4 기계 산식 · 재무 = 3개년 매출·순이익 연속 증가(표시만) · 올해 악재 공시 종목은 편입 전 제외</p>
@@ -509,4 +512,4 @@ if (require.main === module) {
   const exits = events.filter(e => e.type === 'exit' && /^(손절|목표) 이탈/.test(e.why));
   if (exits.length) notifyStop(exits).catch(e => log(`Slack 알림 실패: ${e.message}`));
 }
-module.exports = { scenario, tick, removeFromLineup, cardBounds, krxBars, lastClose, fmt, gateScores, gateCell, buyVerdict, marketOf };
+module.exports = { scenario, tick, removeFromLineup, cardBounds, krxBars, lastClose, fmt, gateScores, gateCell, buyVerdict, marketOf, scenLinks, scenCell };
